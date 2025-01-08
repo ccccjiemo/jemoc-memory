@@ -1,0 +1,11 @@
+{
+  "name": "jemoc_stream",
+  "version": "1.0.0",
+  "description": "Please describe the basic information.",
+  "main": "Index.ets",
+  "author": "",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "libjemoc_stream.so": "file:./src/main/cpp/types/libjemoc_stream"
+  }
+}
