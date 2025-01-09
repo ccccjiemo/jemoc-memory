@@ -29,13 +29,14 @@ DeflateStream::DeflateStream(IStream *stream, DeflateMode mode, int windowBits, 
             throw std::ios_base::failure("DeflateStream: The target stream is not writable.");
         }
         m_canWrite = true;
-        inflater = new Inflater(m_windowBits, m_uncompressSize);
+        deflater = new Deflater(m_windowBits, m_compressionLevel, Z_DEFAULT_STRATEGY);
+
         break;
     case DeflateMode_Decompress:
         if (!stream->getCanRead()) {
             throw std::ios_base::failure("DeflateStream: The target stream is not readable.");
         }
-        deflater = new Deflater(m_windowBits, m_compressionLevel, Z_DEFAULT_STRATEGY);
+        inflater = new Inflater(m_windowBits, m_uncompressSize);
         m_canRead = true;
         break;
     default:

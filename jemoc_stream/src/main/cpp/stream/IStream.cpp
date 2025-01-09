@@ -40,6 +40,7 @@ long IStream::seek(long offset, SeekOrigin origin) {
 void IStream::close() {
     if (m_closed)
         return;
+    m_closed = true;
     m_canRead = false;
     m_canWrite = false;
     m_canSeek = false;
@@ -47,12 +48,11 @@ void IStream::close() {
 }
 
 
-DEFINE_ISTREAM_GET_BOOL_FUNCTION(JSGetCanRead,  getCanRead)
+DEFINE_ISTREAM_GET_BOOL_FUNCTION(JSGetCanRead, getCanRead)
 DEFINE_ISTREAM_GET_BOOL_FUNCTION(JSGetCanWrite, getCanWrite)
 DEFINE_ISTREAM_GET_BOOL_FUNCTION(JSGetCanSeek, getCanSeek)
 DEFINE_ISTREAM_GET_LONG_FUNCTION(JSGetPosition, getPosition)
 DEFINE_ISTREAM_GET_LONG_FUNCTION(JSGetLength, getLength)
-
 
 
 napi_value IStream::JSCopyTo(napi_env env, napi_callback_info info) {

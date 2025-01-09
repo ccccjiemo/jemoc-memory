@@ -104,6 +104,10 @@ struct AsyncWorkData {
         DEFINE_NAPI_FUNCTION("flushAsync", IStream::JSFlushAsync, nullptr, nullptr, className),                        \
         DEFINE_NAPI_FUNCTION("closeAsync", IStream::JSCloseAsync, nullptr, nullptr, className)
 
+#define CHECK_STREAM                                                                                                   \
+    if (stream->isClose()) {                                                                                           \
+        napi_throw_error(env, tagName, "stream is closed");                                                            \
+    }
 
 enum SeekOrigin { Begin, Current, End };
 

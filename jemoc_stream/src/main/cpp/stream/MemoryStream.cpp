@@ -52,6 +52,8 @@ void MemoryStream::setCapacity(long capacity) {
 long MemoryStream::getCapacity() const { return m_capacity; }
 
 void MemoryStream::close() {
+    if (m_closed)
+        return;
     IStream::close();
     m_cache.clear();
     m_cache.resize(0);

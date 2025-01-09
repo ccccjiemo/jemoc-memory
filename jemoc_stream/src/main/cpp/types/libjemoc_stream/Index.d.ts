@@ -2,6 +2,13 @@ export type BufferLike = ArrayBufferLike | Uint8Array;
 
 export enum SeekOrigin {Begin, Current, End}
 
+export interface DeflateStreamOption {
+  leaveOpen?: boolean;
+  windowBits?: number;
+  uncompressSize?: number;
+  bufferSize?: number;
+  compressionLevel?: number;
+}
 
 export interface IStream {
   get canRead(): boolean;
@@ -85,6 +92,42 @@ export class MemoryStream implements IStream {
 
 export class FileStream implements IStream {
   constructor(path: string, mode: number)
+
+  get canRead(): boolean;
+
+  get canWrite(): boolean;
+
+  get canSeek(): boolean;
+
+  get position(): number;
+
+  get length(): number;
+
+  copyTo(stream: IStream, bufferSize?: number | undefined): void;
+
+  copyToAsync(stream: IStream, bufferSize?: number | undefined): Promise<void>;
+
+  seek(offset: number, origin: number): void;
+
+  read(buffer: BufferLike, offset?: number | undefined, count?: number | undefined): number;
+
+  readAsync(buffer: BufferLike, offset?: number | undefined, count?: number | undefined): Promise<number>;
+
+  write(buffer: BufferLike, offset?: number | undefined, count?: number | undefined): number;
+
+  writeAsync(buffer: BufferLike, offset?: number | undefined, count?: number | undefined): Promise<number>;
+
+  flush(): void;
+
+  flushAsync(): Promise<void>;
+
+  close(): void;
+
+  closeAsync(): Promise<void>;
+}
+
+export class DeflateStream implements IStream {
+  constructor(stream: IStream, mode: number, option?: DeflateStreamOption)
 
   get canRead(): boolean;
 
