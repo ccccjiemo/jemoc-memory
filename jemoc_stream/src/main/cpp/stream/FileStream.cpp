@@ -92,7 +92,7 @@ void FileStream::close() {
 
 void FileStream::Export(napi_env env, napi_value exports) {
     napi_property_descriptor desc[] = {
-        DEFINE_NAPI_ISTREAM_PROPERTY,
+        DEFINE_NAPI_ISTREAM_PROPERTY((void*)ClassName.c_str()),
     };
     napi_value napi_cons = nullptr;
     napi_define_class(env, ClassName.c_str(), NAPI_AUTO_LENGTH, JSConstructor, nullptr, sizeof(desc) / sizeof(desc[0]),

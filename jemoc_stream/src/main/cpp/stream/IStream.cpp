@@ -47,12 +47,13 @@ void IStream::close() {
 }
 
 
-DEFINE_ISTREAM_GET_FUNC(JSGetCanRead, getCanRead)
-DEFINE_ISTREAM_GET_FUNC(JSGetCanWrite, getCanWrite)
-DEFINE_ISTREAM_GET_FUNC(JSGetCanSeek, getCanSeek)
-DEFINE_ISTREAM_GET_FUNC(JSGetPosition, getPosition)
-DEFINE_ISTREAM_GET_FUNC(JSGetLength, getLength)
-DEFINE_ISTREAM_SET_FUNC(JSSetPosition, setPosition)
+DEFINE_ISTREAM_GET_BOOL_FUNCTION(JSGetCanRead,  getCanRead)
+DEFINE_ISTREAM_GET_BOOL_FUNCTION(JSGetCanWrite, getCanWrite)
+DEFINE_ISTREAM_GET_BOOL_FUNCTION(JSGetCanSeek, getCanSeek)
+DEFINE_ISTREAM_GET_LONG_FUNCTION(JSGetPosition, getPosition)
+DEFINE_ISTREAM_GET_LONG_FUNCTION(JSGetLength, getLength)
+
+
 
 napi_value IStream::JSCopyTo(napi_env env, napi_callback_info info) {
     GET_JS_INFO(2)

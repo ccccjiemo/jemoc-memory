@@ -12,8 +12,6 @@ export interface IStream {
 
   get position(): number;
 
-  set position(pos: number);
-
   get length(): number;
 
   copyTo(stream: IStream, bufferSize?: number): void
@@ -64,8 +62,6 @@ export class MemoryStream implements IStream {
 
   get position(): number;
 
-  set position(pos: number);
-
   get length(): number;
 
   copyTo(stream: IStream, bufferSize?: number | undefined): void;
@@ -97,8 +93,6 @@ export class FileStream implements IStream {
   get canSeek(): boolean;
 
   get position(): number;
-
-  set position(pos: number);
 
   get length(): number;
 

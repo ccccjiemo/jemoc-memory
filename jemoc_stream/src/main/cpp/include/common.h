@@ -15,8 +15,8 @@ typedef unsigned char byte;
 class IStream;
 
 
-#define DEFINE_NAPI_FUNCTION(name, func, getter, setter)                                                               \
-    { name, nullptr, func, getter, setter, nullptr, napi_default, nullptr }
+#define DEFINE_NAPI_FUNCTION(name, func, getter, setter, data)                                                         \
+    { name, nullptr, func, getter, setter, nullptr, napi_default,  data }
 
 
 

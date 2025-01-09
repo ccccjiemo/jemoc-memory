@@ -120,9 +120,9 @@ napi_value MemoryStream::JSSetCapacity(napi_env env, napi_callback_info info) {
 
 void MemoryStream::Export(napi_env env, napi_value exports) {
     napi_property_descriptor desc[] = {
-        DEFINE_NAPI_ISTREAM_PROPERTY,
-        DEFINE_NAPI_FUNCTION("capacity", nullptr, JSGetCapacity, JSSetCapacity),
-        DEFINE_NAPI_FUNCTION("toArrayBuffer", JSToArrayBuffer, nullptr, nullptr),
+        DEFINE_NAPI_ISTREAM_PROPERTY((void *)ClassName.c_str()),
+        DEFINE_NAPI_FUNCTION("capacity", nullptr, JSGetCapacity, JSSetCapacity, nullptr),
+        DEFINE_NAPI_FUNCTION("toArrayBuffer", JSToArrayBuffer, nullptr, nullptr, nullptr),
     };
     napi_value napi_cons = nullptr;
     napi_define_class(env, ClassName.c_str(), NAPI_AUTO_LENGTH, JSConstructor, nullptr, sizeof(desc) / sizeof(desc[0]),
