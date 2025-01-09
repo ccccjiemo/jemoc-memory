@@ -8,7 +8,12 @@
 #define JEMOC_STREAM_TEST_UTILS_H
 
 #include <napi/native_api.h>
-#include <IStream.h>
+#include <string>
+#include <ios>
+
+typedef unsigned char byte;
+class IStream;
+
 
 #define DEFINE_NAPI_FUNCTION(name, func, getter, setter)                                                               \
     { name, nullptr, func, getter, setter, nullptr, napi_default, nullptr }
@@ -92,6 +97,23 @@ static long getCount(napi_env env, napi_value value, long bufferSize, long offse
     if (result > bufferSize - offset) {
         napi_throw_range_error(env, "IStream", "get count is out of range");
     }
+    return result;
+}
+
+static const std::string getString(napi_env env, napi_value value) {
+    napi_valuetype type;
+    napi_typeof(env, value, &type);
+    if (type != napi_string)
+        return "";
+    size_t size = 0;
+    napi_get_value_string_utf8(env, value, nullptr, 0, &size);
+    if (size == 0)
+        return "";
+
+    char *buffer = new char[size + 1];
+    napi_get_value_string_utf8(env, value, buffer, size + 1, &size);
+    std::string result(buffer);
+    delete[] buffer;
     return result;
 }
 

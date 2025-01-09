@@ -9,7 +9,11 @@ if(DEFINED PACKAGE_FIND_FILE)
 endif()
 
 include_directories(${NATIVERENDER_ROOT_PATH}
-                    ${NATIVERENDER_ROOT_PATH}/include)
+                    ${NATIVERENDER_ROOT_PATH}/include
+                    ${NATIVERENDER_ROOT_PATH}/zlib-ng/include)
 
-add_library(jemoc_stream SHARED napi_init.cpp stream/IStream.cpp stream/MemoryStream.cpp)
-target_link_libraries(jemoc_stream PUBLIC libace_napi.z.so)
+add_library(zlib-ng SHARED IMPORTED)
+set_target_properties(zlib-ng PROPERTIES IMPORTED_LOCATION ${NATIVERENDER_ROOT_PATH}/zlib-ng/libs/${OHOS_ARCH}/libz-ng.a)
+
+add_library(jemoc_stream SHARED napi_init.cpp stream/IStream.cpp stream/MemoryStream.cpp stream/FileStream.cpp)
+target_link_libraries(jemoc_stream PUBLIC libace_napi.z.so zlib-ng)

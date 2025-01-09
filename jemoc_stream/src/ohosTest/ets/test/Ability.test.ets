@@ -1,5 +1,6 @@
 import { hilog } from '@kit.PerformanceAnalysisKit';
 import { describe, beforeAll, beforeEach, afterEach, afterAll, it, expect } from '@ohos/hypium';
+import { MemoryStream } from 'libjemoc_stream.so';
 
 export default function abilityTest() {
   describe('ActsAbilityTest', () => {
@@ -30,6 +31,8 @@ export default function abilityTest() {
       // Defines a variety of assertion methods, which are used to declare expected boolean conditions.
       expect(a).assertContain(b);
       expect(a).assertEqual(a);
+
+
     })
   })
 }

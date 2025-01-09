@@ -13,7 +13,6 @@
 #include <ios>
 #include <napi/native_api.h>
 
-typedef unsigned char byte;
 
 class IStream;
 
@@ -121,8 +120,8 @@ public:
     virtual long seek(long offset, SeekOrigin origin);
     virtual void flush() {}
     virtual void close();
-    virtual long read(void *buffer, long offset, size_t count){};
-    virtual long write(void *buffer, long offset, size_t count){};
+    virtual long read(void *buffer, long offset, size_t count) { return 0; };
+    virtual long write(void *buffer, long offset, size_t count) { return 0; };
 
 protected:
     bool m_canRead;
