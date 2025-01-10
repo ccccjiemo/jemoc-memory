@@ -108,8 +108,6 @@ long DeflateStream::read(void *buffer, long offset, size_t count) {
                     throw std::ios::failure("DeflateStream: found truncated data while decoding.");
                 }
                 break;
-            } else if (n < count) {
-                throw std::ios::failure("DeflateStream: found invalid data while decoding.");
             } else {
                 inflater->setInput(m_buffer, n);
             }

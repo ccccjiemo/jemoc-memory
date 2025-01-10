@@ -19,6 +19,12 @@ class IStream;
     { name, nullptr, func, getter, setter, nullptr, napi_default,  data }
 
 
+#define GET_OBJ(obj, name, func, result)                                                                               \
+    napi_get_named_property(env, obj, name, &value);                                                                   \
+    napi_typeof(env, value, &type);                                                                                    \
+    if (type != napi_undefined) {                                                                                      \
+        func(env, value, &result);                                                                                     \
+    }
 
 // unsafe
 static void *offset_pointer(void *target, long offset) {

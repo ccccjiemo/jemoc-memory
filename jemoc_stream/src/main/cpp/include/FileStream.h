@@ -9,15 +9,15 @@
 #include "IStream.h"
 #include <fstream>
 
+
 enum FILE_MODE {
-    FILE_MODE_APPEND = 0x01,
-    FILE_MODE_ATE = 0x02,
-    FILE_MODE_BINARY = 0x04,
-    FILE_MODE_WRITE = 0x08,
-    FILE_MODE_READ = 0x10,
-    FILE_MODE_READ_WRITE = 0x18,
-    FILE_MODE_TRUNC = 0x20
+    FILE_MODE_READ = 0x00,
+    FILE_MODE_WRITE = 0x01,
+    FILE_MODE_APPEND = 0x02,
+    FILE_MODE_TRUNC = 0x04,
+    FILE_MODE_CREATE = 0x08
 };
+
 
 class FileStream : public IStream {
 public:
@@ -33,13 +33,13 @@ public:
     static napi_ref cons;
     static void Export(napi_env env, napi_value exports);
     static napi_value JSConstructor(napi_env env, napi_callback_info info);
-    static void JSDispose(napi_env env, void* data, void* hint);
+    static void JSDispose(napi_env env, void *data, void *hint);
 
 private:
     std::string m_file_path;
     FILE_MODE m_mode;
     long m_bufferSize;
-    std::fstream m_fileStream;
+    FILE *file = nullptr;
 };
 
 

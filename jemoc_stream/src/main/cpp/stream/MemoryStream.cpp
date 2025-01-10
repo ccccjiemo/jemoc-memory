@@ -9,7 +9,14 @@
 
 std::string MemoryStream::ClassName = "MemoryStream";
 
-MemoryStream::MemoryStream() : IStream() { setCapacity(1); }
+MemoryStream::MemoryStream() {
+    setCapacity(1);
+    m_canWrite = true;
+    m_canSeek = true;
+    m_canRead = true;
+    m_canGetPosition = true;
+    m_canGetLength = true;
+}
 
 MemoryStream::~MemoryStream() { close(); }
 

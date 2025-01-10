@@ -11,7 +11,7 @@
 #include <vector>
 
 
-class MemoryStream : IStream {
+class MemoryStream : public IStream {
 public:
     MemoryStream();
     ~MemoryStream();

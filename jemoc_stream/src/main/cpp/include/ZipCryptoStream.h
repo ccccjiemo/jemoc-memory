@@ -6,13 +6,18 @@
 
 #ifndef JEMOC_STREAM_TEST_ZIPCRYPTOSTREAM_H
 #define JEMOC_STREAM_TEST_ZIPCRYPTOSTREAM_H
+#define INCLUDECRYPTINGCODE_IFCRYPTALLOWED
 #include "IStream.h"
+#include "zlib-ng.h"
+#include "crypt.h"
+#include "common.h"
 
 enum CryptoMode { CryptoMode_Decode, CryptoMode_Encode };
 
 class ZipCryptoStream : public IStream {
 public:
-    ZipCryptoStream(IStream *stream, CryptoMode mode, const std::string &password, bool leaveOpen, unsigned long crc);
+    ZipCryptoStream(IStream *stream, CryptoMode mode, const std::string &password, bool leaveOpen, unsigned long crc,
+                    size_t bufferSize);
     ~ZipCryptoStream();
 
     long read(void *buffer, long offset, size_t count) override;
@@ -21,10 +26,19 @@ public:
     long getPosition() const override;
     long getLength() const override;
 
+    static std::string ClassName;
+    static napi_ref cons;
+    static napi_value JSConstructor(napi_env env, napi_callback_info info);
+    static void JSDispose(napi_env env, void *data, void *hint);
+    static void Export(napi_env env, napi_value exports);
+
 private:
     void writeCrypthead();
     void ensureNotClose();
     void checkStream();
+    void ensureBuffer();
+    void decodeStream(void *buffer, long offset, size_t count);
+    void encodeStream(void *buffer, long offset, size_t count);
 
 private:
     IStream *m_stream = nullptr;

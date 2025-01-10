@@ -161,3 +161,45 @@ export class DeflateStream implements IStream {
 
   closeAsync(): Promise<void>;
 }
+
+interface ZipCryptoStreamOption {
+  leaveOpen?: boolean;
+  bufferSize?: number;
+}
+
+export class ZipCryptoStream implements IStream {
+  constructor(stream: IStream, mode:number, passwd: string, crc: number, option?: ZipCryptoStreamOption)
+  
+  get canRead(): boolean;
+
+  get canWrite(): boolean;
+
+  get canSeek(): boolean;
+
+  get position(): number;
+
+  get length(): number;
+
+  copyTo(stream: IStream, bufferSize?: number | undefined): void;
+
+  copyToAsync(stream: IStream, bufferSize?: number | undefined): Promise<void>;
+
+  seek(offset: number, origin: number): void;
+
+  read(buffer: BufferLike, offset?: number | undefined, count?: number | undefined): number;
+
+  readAsync(buffer: BufferLike, offset?: number | undefined, count?: number | undefined): Promise<number>;
+
+  write(buffer: BufferLike, offset?: number | undefined, count?: number | undefined): number;
+
+  writeAsync(buffer: BufferLike, offset?: number | undefined, count?: number | undefined): Promise<number>;
+
+  flush(): void;
+
+  flushAsync(): Promise<void>;
+
+  close(): void;
+
+  closeAsync(): Promise<void>;
+
+}

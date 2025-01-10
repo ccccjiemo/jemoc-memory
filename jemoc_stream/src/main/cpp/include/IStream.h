@@ -133,8 +133,8 @@ public:
 
 public:
     IStream()
-        : m_canRead(true), m_canWrite(true), m_canSeek(true), m_position(0), m_length(0), m_canGetLength(true),
-          m_canGetPosition(true), m_closed(false) {}
+        : m_canRead(false), m_canWrite(false), m_canSeek(false), m_position(0), m_length(0), m_canGetLength(false),
+          m_canGetPosition(false), m_closed(false) {}
     virtual bool getCanRead() const { return m_canRead; }
     virtual bool getCanWrite() const { return m_canWrite; }
     virtual bool getCanSeek() const { return m_canSeek; }

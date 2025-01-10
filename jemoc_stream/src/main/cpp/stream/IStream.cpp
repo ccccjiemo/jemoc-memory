@@ -157,8 +157,11 @@ napi_value IStream::JSFlush(napi_env env, napi_callback_info info) {
 }
 
 napi_value IStream::JSClose(napi_env env, napi_callback_info info) {
-    GET_JS_INFO(0);
-    stream->close();
+    GET_JS_INFO_WITHOUT_STREAM(0)
+    IStream *stream = getStream(env, _this);
+    if (stream == nullptr) {
+        napi_throw_error(env, tagName, "stream is null");
+    }
     return nullptr;
 }
 

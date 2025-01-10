@@ -5,30 +5,46 @@
 // please include "napi/native_api.h".
 
 #include "FileStream.h"
+#include <cstdio>
+#include <unistd.h>
+
 
 std::string FileStream::ClassName = "FileStream";
 napi_ref FileStream::cons = nullptr;
 
 FileStream::FileStream(const std::string &path, FILE_MODE mode, long bufferSize)
     : m_file_path(path), m_mode(mode), m_bufferSize(bufferSize) {
-    m_fileStream.open(path, m_mode);
 
-    if (!m_fileStream.is_open()) {
-        m_fileStream.close();
-        throw std::ios_base::failure("FileStream: open file failed");
+    m_canGetLength = true;
+    m_canGetPosition = true;
+    m_canSeek = true;
+    m_canRead = true;
+    char open_mode[3] = "r";
+    if (mode & FILE_MODE_WRITE) {
+        open_mode[1] = '+';
+        m_canWrite = true;
+    }
+    if ((mode & FILE_MODE_TRUNC) || ((mode & FILE_MODE_CREATE) && (access(path.c_str(), F_OK) != 0))) {
+        open_mode[0] = 'w';
     }
 
-    m_fileStream.exceptions(std::ios::failbit | std::ios::badbit);
-    m_canSeek = (m_mode & FILE_MODE_APPEND) != 0;
-    m_canRead = (m_mode & FILE_MODE_READ) != 0;
-    m_canWrite = (m_mode & FILE_MODE_WRITE) != 0;
+    FILE *fp = fopen(path.c_str(), open_mode);
+    if (fp == nullptr)
+        throw std::ios::failure(std::string("open file ") + path + " failed");
 
-    m_fileStream.seekg(0, std::ios_base::end);
-    m_length = m_fileStream.tellg();
-    m_position = m_canSeek ? 0 : m_length;
-    m_position = (m_mode & FILE_MODE_ATE) != 0 ? m_length : m_position;
-    m_canGetLength = true;
-    m_closed = false;
+    fseek(fp, 0, SEEK_END);
+    m_length = ftell(fp);
+
+    if (mode & FILE_MODE_APPEND) {
+        m_canRead = false;
+        m_canWrite = true;
+        m_canSeek = false;
+        m_position = m_length;
+    } else {
+        fseek(fp, 0, SEEK_SET);
+    }
+
+    file = fp;
 }
 
 FileStream::~FileStream() {
@@ -39,60 +55,61 @@ FileStream::~FileStream() {
 }
 
 long FileStream::write(void *buffer, long offset, size_t count) {
-    if (!m_fileStream.is_open()) {
-        close();
-        throw std::ios_base::failure("FileStream: The write operation failed because the file was closed ");
-    }
-    try {
-        m_fileStream.seekp(m_position, std::ios_base::beg);
-        const char *pointer = static_cast<char *>(buffer) + offset;
-        m_fileStream.write(pointer, count);
-    } catch (const std::ios::ios_base::failure &e) {
-        close();
-        std::string err = ClassName += ": ";
-        err += e.what();
-        throw std::ios_base::failure(err);
-    }
-    m_position += count;
+    if (m_closed)
+        throw std::ios_base::failure("The write operation failed because the file was closed ");
+
+    if (fseek(file, m_position, SEEK_SET) == -1)
+        throw std::ios_base::failure(std::string("the file might have been closed. "));
+
+    const char *pointer = static_cast<char *>(buffer) + offset;
+    long writeBytes = fwrite(pointer, 1, count, file);
+
+    if (writeBytes == -1)
+        throw std::ios::failure("write stream failed");
+
+    m_position += writeBytes;
     m_length = std::max(m_length, m_position);
-    return count;
+    return writeBytes;
 }
 
 long FileStream::read(void *buffer, long offset, size_t count) {
-    if (!m_fileStream.is_open()) {
-        close();
-        throw std::ios_base::failure("FileStream: The rad operation failed because the file was closed ");
-    }
+    if (m_closed)
+        throw std::ios_base::failure("The write operation failed because the file was closed ");
     long readBytes = count;
     readBytes = std::min(readBytes, m_length - m_position);
     if (readBytes == 0)
         return 0;
-    try {
-        m_fileStream.seekg(m_position, std::ios_base::beg);
-        char *pointer = static_cast<char *>(buffer) + offset;
-        m_fileStream.read(pointer, readBytes);
-    } catch (const std::ios::ios_base::failure &e) {
-        close();
-        std::string err = ClassName += ": ";
-        err += e.what();
-        throw std::ios_base::failure(err);
-    }
+
+    if (fseek(file, m_position, SEEK_SET) == -1)
+        throw std::ios_base::failure(std::string("the file might have been closed. "));
+
+    char *pointer = static_cast<char *>(buffer) + offset;
+    readBytes = fread(pointer, 1, readBytes, file);
+
+    if (readBytes == -1)
+        throw std::ios::failure("read stream failed");
+
     m_position += readBytes;
     return readBytes;
 }
 
-void FileStream::flush() { m_fileStream.flush(); }
+void FileStream::flush() {
+    if (fflush(file) == -1) {
+        throw std::ios::failure("flush stream failed");
+    }
+}
 
 void FileStream::close() {
     if (!m_closed) {
         IStream::close();
-        m_fileStream.close();
+        fclose(file);
+        file = nullptr;
     }
 }
 
 void FileStream::Export(napi_env env, napi_value exports) {
     napi_property_descriptor desc[] = {
-        DEFINE_NAPI_ISTREAM_PROPERTY((void*)ClassName.c_str()),
+        DEFINE_NAPI_ISTREAM_PROPERTY((void *)ClassName.c_str()),
     };
     napi_value napi_cons = nullptr;
     napi_define_class(env, ClassName.c_str(), NAPI_AUTO_LENGTH, JSConstructor, nullptr, sizeof(desc) / sizeof(desc[0]),

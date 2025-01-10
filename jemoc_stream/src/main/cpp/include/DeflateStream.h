@@ -15,12 +15,6 @@
 
 #define DEFAULT_BUFFER_SIZE 4096
 
-#define GET_OBJ(obj, name, func, result)                                                                               \
-    napi_get_named_property(env, obj, name, &value);                                                                   \
-    napi_typeof(env, value, &type);                                                                                    \
-    if (type != napi_undefined) {                                                                                      \
-        func(env, value, &result);                                                                                     \
-    }
 
 enum DeflateMode { DeflateMode_Compress, DeflateMode_Decompress };
 
