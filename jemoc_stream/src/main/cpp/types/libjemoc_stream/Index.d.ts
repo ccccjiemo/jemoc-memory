@@ -1,6 +1,6 @@
 export type BufferLike = ArrayBufferLike | Uint8Array;
 
-export enum SeekOrigin {Begin, Current, End}
+export enum SeekOrigin { Begin, Current, End }
 
 export interface DeflateStreamOption {
   leaveOpen?: boolean;
@@ -168,8 +168,8 @@ interface ZipCryptoStreamOption {
 }
 
 export class ZipCryptoStream implements IStream {
-  constructor(stream: IStream, mode:number, passwd: string, crc: number, option?: ZipCryptoStreamOption)
-  
+  constructor(stream: IStream, mode: number, passwd: string, crc: number, option?: ZipCryptoStreamOption)
+
   get canRead(): boolean;
 
   get canWrite(): boolean;
@@ -201,5 +201,33 @@ export class ZipCryptoStream implements IStream {
   close(): void;
 
   closeAsync(): Promise<void>;
+
+}
+
+interface ZipArchiveOption {
+  mode?: number;
+  leaveOpen?: boolean;
+  password?: string;
+}
+
+export class ZipArchiveEntry {
+
+}
+
+export class ZipArchive {
+  constructor(stream: IStream, option?: ZipArchiveOption)
+  constructor(path: string, option?: ZipArchiveOption)
+
+  get entries(): ZipArchiveEntry[]
+
+  get comment(): string
+  set comment(value: string)
+
+  get mode(): number
+
+  getEntry(entryName: string): ZipArchiveEntry | undefined
+  createEntry(entryName: string): ZipArchiveEntry
+
+  close(): void
 
 }

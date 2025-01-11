@@ -4,7 +4,7 @@
 // Node APIs are not fully supported. To solve the compilation error of the interface cannot be found,
 // please include "napi/native_api.h".
 
-#include "Deflater.h"
+#include "deflate/Deflater.h"
 #include <ios>
 
 static int getMemLevel(int level) { return level == Z_NO_COMPRESSION ? 7 : 8; }

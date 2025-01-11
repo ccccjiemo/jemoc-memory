@@ -10,6 +10,7 @@ endif()
 
 file(GLOB STREAM_FILE "stream/*.cpp")
 file(GLOB DEFLATE_FILE "deflate/*.cpp")
+file(GLOB ZIP_FILE "zip/*.cpp")
 
 include_directories(${NATIVERENDER_ROOT_PATH}
                     ${NATIVERENDER_ROOT_PATH}/include
@@ -18,5 +19,5 @@ include_directories(${NATIVERENDER_ROOT_PATH}
 add_library(zlib-ng SHARED IMPORTED)
 set_target_properties(zlib-ng PROPERTIES IMPORTED_LOCATION ${NATIVERENDER_ROOT_PATH}/zlib-ng/libs/${OHOS_ARCH}/libz-ng.a)
 
-add_library(jemoc_stream SHARED napi_init.cpp ${STREAM_FILE} ${DEFLATE_FILE})
+add_library(jemoc_stream SHARED napi_init.cpp ${STREAM_FILE} ${DEFLATE_FILE} ${ZIP_FILE})
 target_link_libraries(jemoc_stream PUBLIC libace_napi.z.so zlib-ng)

@@ -14,9 +14,13 @@
 typedef unsigned char byte;
 class IStream;
 
+#define NAPI_CALL(env, func)                                                                                           \
+    if (napi_ok != func) {                                                                                             \
+        napi_throw_error(env, "NAPI_CALL_ERROR", #func);                                                                \
+    }
 
 #define DEFINE_NAPI_FUNCTION(name, func, getter, setter, data)                                                         \
-    { name, nullptr, func, getter, setter, nullptr, napi_default,  data }
+    { name, nullptr, func, getter, setter, nullptr, napi_default, data }
 
 
 #define GET_OBJ(obj, name, func, result)                                                                               \
