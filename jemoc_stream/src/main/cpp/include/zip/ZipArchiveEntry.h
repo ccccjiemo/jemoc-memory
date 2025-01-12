@@ -42,10 +42,25 @@ enum GeneralPurposeBitFlag {
 
 class ZipArchiveEntry {
 public:
-    ZipArchiveEntry(ZipArchive *archive, ZipCentralDirectoryRecord *record);
+    ZipArchiveEntry(ZipArchive *archive, const ZipCentralDirectoryRecord &record);
     ZipArchiveEntry(ZipArchive *archive, const std::string &entryName, int compressionLevel);
 
-    std::string getFullName() const;
+    std::string getFullName();
+    CompressionMethod getCompressionMethod() const;
+    IStream *open();
+    long getOffsetOfCompressedData();
+
+public:
+    bool writeLocalFileHeader();
+    void writeCrcAndSizesInLocalHeader();
+    void writeDataDescriptor();
+    ZipArchive *getArchive();
+
+private:
+    IStream *openInReadMode();
+    IStream *openInCreateMode();
+    IStream *getDataDecompressor(IStream *stream);
+    IStream *getDataCompressor(IStream *stream, bool leaveOpen);
 
 
 public:
@@ -56,6 +71,7 @@ public:
     static void JSDispose(napi_env env, void *data, void *hint);
     static ZipArchiveEntry *getEntry(napi_env env, napi_value value);
     static napi_value createJSEntry(napi_env env, ZipArchiveEntry *entry, napi_ref *ref);
+    static napi_value JSOpen(napi_env env, napi_callback_info info);
 
 private:
     int m_compression_level;
@@ -64,7 +80,7 @@ private:
     bool m_originallyInArchive;
     ushort diskNumberStart;
 
-    ushort verionMadeBy;
+    ushort versionMadeBy;
     ushort versionToExtract;
     ushort flags;
     ushort compressionMethod;
@@ -76,9 +92,19 @@ private:
     uint externalFileAttr;
     uint headerOffset;
 
-    std::string fileName;
-    std::string fileComment;
+    long stored_offsetOfCompressedData = -1;
+
+    ushort fileNameLength;
+    ushort extraFieldLength;
+
+    char *fileName = nullptr;
+    char *fileComment = nullptr;
+    char *extraField = nullptr;
     std::vector<ZipGenericExtraField> fields;
+
+    std::string m_stored_fullname;
+
+    bool m_everOpenedForWrite = false;
 };
 
 #endif // JEMOC_STREAM_TEST_ZIPARCHIVEENTRY_H

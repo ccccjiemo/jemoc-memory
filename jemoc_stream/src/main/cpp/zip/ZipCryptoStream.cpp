@@ -4,7 +4,7 @@
 // Node APIs are not fully supported. To solve the compilation error of the interface cannot be found,
 // please include "napi/native_api.h".
 #include "zip/ZipCryptoStream.h"
-
+#include "stream/MemoryStream.h"
 
 
 std::string ZipCryptoStream::ClassName = "ZipCryptoStream";
@@ -27,6 +27,7 @@ ZipCryptoStream::ZipCryptoStream(IStream *stream, CryptoMode mode, const std::st
 
     if (m_crc != 0 && mode == CryptoMode_Encode) {
         m_hasCrc = true;
+        m_write_finished = true;
         writeCrypthead();
     }
 }
@@ -105,25 +106,47 @@ long ZipCryptoStream::write(void *buffer, long offset, size_t count) {
     ensureNotClose();
     checkStream();
     ensureBuffer();
-    int t;
-    const uint32_t *crc_tab = zng_get_crc_table();
-    long p = 0;
-    uint8_t *_buffer = static_cast<uint8_t *>(buffer);
+
+    if (m_write_finished) {
+        int t;
+        const uint32_t *crc_tab = zng_get_crc_table();
+        long p = 0;
+        uint8_t *_buffer = static_cast<uint8_t *>(buffer);
 
 
-    for (long i = 0; i < count; i++) {
-        zencode(pkeys, crc_tab, *(_buffer + offset + i), t);
-        *(m_buffer + p) = t;
-        p += 1;
-        if (m_buffer_Size == p) {
-            m_stream->write(m_buffer, 0, m_buffer_Size);
-            p = 0;
+        for (long i = 0; i < count; i++) {
+            zencode(pkeys, crc_tab, *(_buffer + offset + i), t);
+            *(m_buffer + p) = t;
+            p += 1;
+            if (m_buffer_Size == p) {
+                m_stream->write(m_buffer, 0, m_buffer_Size);
+                p = 0;
+            }
+        }
+        if (p > 0) {
+            m_stream->write(m_buffer, 0, p);
+        }
+        return count;
+    } else {
+        if (m_cache == nullptr) {
+            m_cache = new MemoryStream();
+        }
+        m_cache->write(buffer, offset, count);
+    }
+}
+
+void ZipCryptoStream::setCRC(unsigned long crc) {
+    if (m_mode == CryptoMode_Encode && !m_write_finished) {
+        m_crc = crc;
+        m_write_finished = true;
+        writeCrypthead();
+        m_cache->seek(0, SeekOrigin::Begin);
+        ensureBuffer();
+        size_t readBytes = 0;
+        while ((readBytes = m_cache->read(m_buffer, 0, m_buffer_Size)) != 0) {
+            write(m_buffer, 0, readBytes);
         }
     }
-    if (p > 0) {
-        m_stream->write(m_buffer, 0, p);
-    }
-    return count;
 }
 
 void ZipCryptoStream::close() {
@@ -136,6 +159,9 @@ void ZipCryptoStream::close() {
     m_stream = nullptr;
     if (m_buffer != nullptr) {
         free(m_buffer);
+    }
+    if (m_cache != nullptr) {
+        m_cache->close();
     }
 }
 

@@ -8,10 +8,8 @@
 #include <cstdint>
 
 bool ZipEndOfCentralDirectoryRecord::tryReadRecord(IStream *stream, ZipEndOfCentralDirectoryRecord *record) {
-    ZipEndOfCentralDirectoryRecord _record;
-    stream->read(&record, 0, sizeof(ZipEndOfCentralDirectoryRecord));
-    if (_record.signature == ZIP_EOCD_SIGNATURE) {
-        *record = _record;
+    stream->read(record, 0, sizeof(ZipEndOfCentralDirectoryRecord));
+    if (record->signature == ZIP_EOCD_SIGNATURE) {
         return true;
     }
     return false;
@@ -32,59 +30,49 @@ void ZipEndOfCentralDirectoryRecord::writeRecord(IStream *stream, ushort entries
     }
 }
 
-ZipCentralDirectoryRecord::~ZipCentralDirectoryRecord() {
-    if (fileName != nullptr) {
-        delete[] fileName;
-        fileName = nullptr;
-    }
-    if (fileComment != nullptr) {
-        delete[] fileComment;
-        fileComment = nullptr;
-    }
-    if (extraField != nullptr) {
-        delete[] extraField;
-        extraField = nullptr;
-    }
-}
-
 bool ZipCentralDirectoryRecord::tryReadRecord(IStream *stream, bool saveExtraFieldsAndComment,
                                               ZipCentralDirectoryRecord *record) {
-    ZipCentralDirectoryRecord *_record = new ZipCentralDirectoryRecord;
     stream->read(record, 0, ZIP_SIZEOF_CentralDirectory_Header);
-    if (_record->signature != ZIP_CentralDirectory_SIGNATURE) {
-        delete _record;
+    if (record->signature != ZIP_CentralDirectory_SIGNATURE) {
         return false;
     }
-
-    if (_record->fileNameLength) {
-        _record->fileName = new char[_record->fileNameLength];
-        stream->read(_record->fileName, 0, _record->fileNameLength);
-    }
-    if (_record->extraFieldLength) {
-        _record->extraField = new char[_record->extraFieldLength];
-        stream->read(_record->extraField, 0, _record->extraFieldLength);
-    }
-    if (_record->fileCommentLength) {
-        _record->fileComment = new char[_record->fileCommentLength];
-        stream->read(_record->fileComment, 0, _record->fileCommentLength);
-    }
-    *record = *_record;
     return true;
 }
 
-std::vector<ZipGenericExtraField> ZipGenericExtraField::tryRead(void *buffer, size_t size) {
+std::vector<ZipGenericExtraField> ZipGenericExtraField::tryRead(IStream *stream, size_t size) {
     std::vector<ZipGenericExtraField> list;
+    uint8_t *buffer = new uint8_t[size];
+    stream->read(buffer, 0, size);
     long pointer = 0;
     while (pointer + 4 < size) {
         ZipGenericExtraField field;
-        memcpy(&field, offset_pointer(buffer, pointer), 4);
+        memcpy(&field, buffer + pointer, 4);
         pointer += 4;
         if (field.size > size - pointer)
             break;
         field.data = new uint8_t[field.size];
-        memcpy(field.data, offset_pointer(buffer, pointer), field.size);
+        memcpy(field.data, buffer + pointer, field.size);
         pointer += field.size;
         list.push_back(field);
     }
+    delete[] buffer;
     return list;
+}
+
+bool ZipDataDescriptor::tryRead(IStream *stream, ZipDataDescriptor *descriptor) {
+    stream->read(descriptor, 0, sizeof(ZipDataDescriptor));
+    if (descriptor->signature != ZIP_DATADESCRIPTOR_SIGNATURE) {
+        stream->seek(-sizeof(ZipDataDescriptor), SeekOrigin::Current);
+        return false;
+    }
+    return true;
+}
+
+bool ZipLocalFileHeader::trySkip(IStream *stream) {
+    ZipLocalFileHeader header;
+    stream->read(&header, 0, sizeof(ZipLocalFileHeader));
+    if (header.signature != ZIP_LOCALFILEHEADER_SIGNATURE)
+        return false;
+    stream->seek(header.fileNameLength + header.extraFieldLength, SeekOrigin::Current);
+    return true;
 }

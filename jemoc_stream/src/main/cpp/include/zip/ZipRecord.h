@@ -12,8 +12,11 @@
 
 #define ZIP_EOCD_SIGNATURE 0x06054b50
 #define ZIP_CentralDirectory_SIGNATURE 0x02014b50
+#define ZIP_DATADESCRIPTOR_SIGNATURE 0x08074b50
+#define ZIP_LOCALFILEHEADER_SIGNATURE 0x04034b50
 #define ZIP_SIZEOF_CentralDirectory_Header 46
 #define ZIP_EOCD_SIZEOFRECORD_WITHOUT_SIGNATURE 18
+#define ZIP_LOCALFILEHEADER_OFFSET_TO_CRC 14
 
 struct ZipEndOfCentralDirectoryRecord {
     uint signature;
@@ -47,10 +50,6 @@ struct ZipCentralDirectoryRecord {
     ushort internalAttributes;
     uint externalAttributes;
     uint headerOffset;
-    char *fileName = nullptr;
-    char *extraField = nullptr;
-    char *fileComment = nullptr;
-    ~ZipCentralDirectoryRecord();
     static bool tryReadRecord(IStream *stream, bool saveExtraFieldsAndComment, ZipCentralDirectoryRecord *record);
 } __attribute__((packed));
 
@@ -58,10 +57,30 @@ struct ZipGenericExtraField {
     ushort tag;
     ushort size;
     uint8_t* data = nullptr;
-    static std::vector<ZipGenericExtraField> tryRead(void* buffer, size_t size);
+    static std::vector<ZipGenericExtraField> tryRead(IStream* stream, size_t size);
+} __attribute__((packed));
+
+struct ZipDataDescriptor {
+    uint signature;
+    uint crc;
+    uint compressedSize;
+    uint uncompressedSize;
+    static bool tryRead(IStream * stream, ZipDataDescriptor* descriptor);
 };
 
-
+struct ZipLocalFileHeader {
+    uint signature;
+    ushort version;
+    ushort flags;
+    ushort compression;
+    uint lastModifier;
+    uint crc;
+    uint compressedSize;
+    uint uncompressedSize;
+    ushort fileNameLength;
+    ushort extraFieldLength;
+    static bool trySkip(IStream* stream);
+}__attribute__((packed));
 
 namespace ZipCentralDirectory {}
 #endif // JEMOC_STREAM_TEST_ZIPENDOFCENTRALDIRECTORYRECORD_H

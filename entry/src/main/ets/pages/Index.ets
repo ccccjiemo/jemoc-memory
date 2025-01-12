@@ -1,4 +1,4 @@
-import { DeflateStream, FileStream, MemoryStream, using, ZipCryptoStream } from '@jemoc/stream';
+import { DeflateStream, FileStream, MemoryStream, using, ZipArchive, ZipCryptoStream } from '@jemoc/stream';
 import { fileUri } from '@kit.CoreFileKit';
 
 @Entry
@@ -19,27 +19,44 @@ struct Index {
       Button('test')
         .onClick(() => {
           getContext(this).resourceManager.getRawFileContent('test.zip', (err, data) => {
-
-
-            let total = 92961877;
-            let dir = getContext(this).cacheDir + '/test.pdf';
-            let buffer = new ArrayBuffer(8196);
             let ms = new MemoryStream(data.length)
             ms.write(data);
-            ms.seek(0x55, 0);
-            let crypto = new ZipCryptoStream(ms, 0, "12345678", 0x4b637667);
-            let ds = new DeflateStream(crypto, 1, {bufferSize: 8192});
+            let archive = new ZipArchive(ms, { password: '12345678' });
+
+            let entries = archive.entries;
+            let stream = entries[0].open();
+            let dir = getContext(this).cacheDir + '/test.pdf';
+
             let fs = new FileStream(dir, 0x19);
+            let bytesRead = 0;
+            let buffer = new ArrayBuffer(4096);
             let start = Date.now();
-            while (total != 0) {
-              let readBytes = ds.read(buffer, 0, Math.min(buffer.byteLength, total));
-              let writeBytes = fs.write(buffer, 0, readBytes);
-              total -= readBytes;
+            while ((bytesRead = stream.read(buffer)) != 0) {
+              fs.write(buffer, 0, bytesRead);
             }
             fs.close();
-            crypto.close();
-            ms.close();
+            stream.close();
+            console.log('1');
             console.log(`decompress: ${Date.now() - start}ms`)
+            //
+            // let total = 92961877;
+            // let buffer = new ArrayBuffer(8196);
+            // let ms = new MemoryStream(data.length)
+            // ms.write(data);
+            // ms.seek(0x55, 0);
+            // let crypto = new ZipCryptoStream(ms, 0, "12345678", 0x4b637667);
+            // let ds = new DeflateStream(crypto, 1, {bufferSize: 8192});
+            // let fs = new FileStream(dir, 0x19);
+            // let start = Date.now();
+            // while (total != 0) {
+            //   let readBytes = ds.read(buffer, 0, Math.min(buffer.byteLength, total));
+            //   let writeBytes = fs.write(buffer, 0, readBytes);
+            //   total -= readBytes;
+            // }
+            // fs.close();
+            // crypto.close();
+            // ms.close();
+            // console.log(`decompress: ${Date.now() - start}ms`)
 
           })
         })

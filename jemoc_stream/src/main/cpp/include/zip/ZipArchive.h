@@ -9,6 +9,8 @@
 #include <string>
 #include <napi/native_api.h>
 #include "IStream.h"
+#include <vector>
+#include <unordered_map>
 
 class ZipArchiveEntry;
 
@@ -16,15 +18,17 @@ enum ZipArchiveMode { ZipArchiveMode_Read, ZipArchiveMode_Update, ZipArchiveMode
 
 class ZipArchive {
 public:
-    ZipArchive(IStream *stream, const ZipArchiveMode mode, bool leaveOpen);
-    ZipArchive(const std::string &path, const ZipArchiveMode mode);
+    ZipArchive(IStream *stream, const ZipArchiveMode mode, const std::string &password, bool leaveOpen);
+    ZipArchive(const std::string &path, const ZipArchiveMode mode, const std::string &password);
     ~ZipArchive();
     std::string getComment() const;
     void setComment(const std::string &comment);
     ZipArchiveMode getMode() const;
     ZipArchiveEntry *createEntry(const std::string &entryName, int compressionLevel);
     ZipArchiveEntry *getEntry(const std::string &entryName);
-    std::vector<ZipArchiveEntry *> getEntries() const;
+    std::vector<ZipArchiveEntry *> getEntries();
+    IStream *getArchiveStream() { return m_stream; }
+    std::string getPassword() const { return m_passwd; }
     void close();
 
 public:
@@ -56,6 +60,7 @@ private:
 private:
     IStream *m_stream = nullptr;
     const ZipArchiveMode m_mode;
+    const std::string m_passwd;
     const bool m_leaveOpen;
     IStream *m_backingStream = nullptr;
     std::vector<ZipArchiveEntry *> m_entries;

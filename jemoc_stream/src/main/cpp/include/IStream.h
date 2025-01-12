@@ -129,6 +129,7 @@ public:
     static napi_value JSCopyToAsync(napi_env env, napi_callback_info info);
     static napi_value JSFlushAsync(napi_env env, napi_callback_info info);
     static napi_value JSCloseAsync(napi_env env, napi_callback_info info);
+    static napi_value JSCreateInterface(napi_env env, IStream* stream);
 
 
 public:

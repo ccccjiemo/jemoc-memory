@@ -371,3 +371,18 @@ napi_value IStream::JSCloseAsync(napi_env env, napi_callback_info info) {
     napi_queue_async_work(env, asyncData->work);
     return promise;
 }
+
+napi_value IStream::JSCreateInterface(napi_env env, IStream *stream) {
+    napi_value result = nullptr;
+    napi_property_descriptor desc[] = {DEFINE_NAPI_ISTREAM_PROPERTY(nullptr)};
+    NAPI_CALL(env, napi_create_object_with_properties(env, &result, sizeof(desc) / sizeof(desc[0]), desc))
+    NAPI_CALL(env, napi_wrap(
+                       env, result, stream,
+                       [](napi_env env, void *data, void *hint) {
+                           IStream *stream = static_cast<IStream *>(data);
+                           stream->close();
+                           delete stream;
+                       },
+                       nullptr, nullptr))
+    return result;
+}

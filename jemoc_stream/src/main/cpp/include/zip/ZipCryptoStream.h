@@ -11,13 +11,14 @@
 #include "zlib-ng.h"
 #include "crypt.h"
 #include "common.h"
+#define ZipCryptoStream_DefaultBufferSize 4096
 
 enum CryptoMode { CryptoMode_Decode, CryptoMode_Encode };
 
 class ZipCryptoStream : public IStream {
 public:
-    ZipCryptoStream(IStream *stream, CryptoMode mode, const std::string &password, bool leaveOpen, unsigned long crc,
-                    size_t bufferSize);
+    ZipCryptoStream(IStream *stream, CryptoMode mode, const std::string &password, bool leaveOpen,
+                    unsigned long crc = 0, size_t bufferSize = ZipCryptoStream_DefaultBufferSize);
     ~ZipCryptoStream();
 
     long read(void *buffer, long offset, size_t count) override;
@@ -25,6 +26,8 @@ public:
     void close() override;
     long getPosition() const override;
     long getLength() const override;
+
+    void setCRC(unsigned long crc);
 
     static std::string ClassName;
     static napi_ref cons;
@@ -51,6 +54,8 @@ private:
     size_t m_total_read = 0;
     uint8_t *m_buffer = nullptr;
     size_t m_buffer_Size;
+    IStream *m_cache = nullptr;
+    bool m_write_finished = false;
 };
 
 #endif // JEMOC_STREAM_TEST_ZIPCRYPTOSTREAM_H

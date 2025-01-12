@@ -211,6 +211,10 @@ interface ZipArchiveOption {
 }
 
 export class ZipArchiveEntry {
+  private constructor()
+  open(): IStream
+  close(): void
+  get fullName(): string
 
 }
 
