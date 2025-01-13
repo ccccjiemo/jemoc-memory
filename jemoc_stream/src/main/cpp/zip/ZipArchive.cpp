@@ -78,12 +78,33 @@ ZipArchive::ZipArchive(const std::string &path, const ZipArchiveMode mode, const
     new (this) ZipArchive(stream, mode, password, false);
 }
 
-ZipArchive::~ZipArchive() { close(); }
+ZipArchive::~ZipArchive() {}
+
+void ZipArchive::close(napi_env env) {
+    close();
+    for (auto entry = m_entries.begin(); entry != m_entries.end(); entry++) {
+        (*entry)->releaseJSEntry(env);
+        delete (*entry);
+    }
+    m_entries.clear();
+    m_entriesDictionary.clear();
+}
 
 void ZipArchive::close() {
     if (m_close)
         return;
     m_close = true;
+
+    switch (m_mode) {
+    case ZipArchiveMode_Read:
+        break;
+    case ZipArchiveMode_Update:
+    case ZipArchiveMode_Create:
+    default:
+        writeFile();
+        break;
+    }
+
     if ((m_backingStream != nullptr || !m_leaveOpen) && m_stream != nullptr) {
         m_stream->close();
         m_stream = nullptr;
@@ -92,7 +113,6 @@ void ZipArchive::close() {
         m_backingStream->close();
         m_backingStream = nullptr;
     }
-    m_entries.clear();
     m_archiveComment = "";
 }
 
@@ -162,6 +182,44 @@ ZipArchiveEntry *ZipArchive::getEntry(const std::string &entryName) {
 std::vector<ZipArchiveEntry *> ZipArchive::getEntries() {
     ensureCentralDirectoryRead();
     return m_entries;
+}
+
+void ZipArchive::writeFile() {
+    if (m_mode == ZipArchiveMode_Update) {
+        for (auto entry = m_entries.begin(); entry != m_entries.end(); entry++) {
+            (*entry)->loadLocalHeaderExtraFieldAndCompressedBytesIfNeeded();
+        }
+    }
+
+    m_stream->seek(0, SeekOrigin::Begin);
+    m_stream->setLength(0);
+
+    for (auto entry = m_entries.begin(); entry != m_entries.end(); entry++) {
+        (*entry)->writeAndFinishLocalEntry();
+    }
+    long startOfCentralDirectory = m_stream->getPosition();
+
+    for (auto entry = m_entries.begin(); entry != m_entries.end(); entry++) {
+        (*entry)->writeCentralDirectoryFileHeader();
+    }
+    long sizeOfCentralDirectory = m_stream->getPosition() - startOfCentralDirectory;
+    writeArchiveEpilogue(startOfCentralDirectory, sizeOfCentralDirectory);
+}
+
+void ZipArchive::writeArchiveEpilogue(long startOfCentralDirectory, long sizeOfCentralDirectory) {
+    ZipEndOfCentralDirectoryRecord record{};
+    record.signature = ZIP_EOCD_SIGNATURE;
+    record.diskNumber = 0;
+    record.startDiskNumber = 0;
+    record.entriesOnDisk = m_entries.size();
+    record.entriesInDirectory = m_entries.size();
+    record.directorySize = sizeOfCentralDirectory;
+    record.directoryOffset = startOfCentralDirectory;
+    record.commentLength = m_archiveComment.length();
+    m_stream->write(&record, 0, sizeof(record));
+    if (m_archiveComment.length() > 0) {
+        m_stream->write((char *)m_archiveComment.c_str(), 0, m_archiveComment.length());
+    }
 }
 
 
@@ -299,21 +357,11 @@ napi_value ZipArchive::JSSetComment(napi_env env, napi_callback_info info) {
 napi_value ZipArchive::getEntries(napi_env env) {
     napi_value arr = nullptr;
     std::vector<ZipArchiveEntry *> list = getEntries();
+    napi_value jsValue = nullptr;
     NAPI_CALL(env, napi_create_array_with_length(env, list.size(), &arr))
     for (int i = 0; i < list.size(); i++) {
-        auto it = list[i];
-        auto js_ref = m_entries_js.find(it);
-        if (js_ref == m_entries_js.end()) {
-            napi_ref ref = nullptr;
-            napi_value value = ZipArchiveEntry::createJSEntry(env, it, &ref);
-            NAPI_CALL(env, napi_set_element(env, arr, i, value))
-            m_entries_js.emplace(it, ref);
-        } else {
-            napi_ref ref = m_entries_js[it];
-            napi_value value = nullptr;
-            napi_get_reference_value(env, ref, &value);
-            NAPI_CALL(env, napi_set_element(env, arr, i, value))
-        }
+        jsValue = list[i]->getJSEntry(env);
+        NAPI_CALL(env, napi_set_element(env, arr, i, jsValue))
     }
     return arr;
 }
@@ -336,19 +384,11 @@ napi_value ZipArchive::getEntry(napi_env env, const std::string &entryName) {
     if (entry == nullptr)
         return nullptr;
 
-    auto ref_it = m_entries_js.find(entry);
+    auto it = m_entriesDictionary.find(entryName);
+    if (it == m_entriesDictionary.end())
+        return nullptr;
 
-    if (ref_it == m_entries_js.end()) {
-        napi_ref ref = nullptr;
-        napi_value value = ZipArchiveEntry::createJSEntry(env, entry, &ref);
-        m_entries_js.emplace(entry, ref);
-        return value;
-    } else {
-        napi_ref ref = ref_it->second;
-        napi_value value = nullptr;
-        napi_get_reference_value(env, ref, &value);
-        return value;
-    }
+    return it->second->getJSEntry(env);
 }
 
 
@@ -369,13 +409,10 @@ ZipArchiveEntry *ZipArchive::createEntry(const std::string &entryName, int compr
 }
 
 napi_value ZipArchive::createEntry(napi_env env, const std::string &entryName, int compressionLevel) {
-    napi_ref ref = nullptr;
     ZipArchiveEntry *entry = createEntry(entryName, compressionLevel);
     if (entry == nullptr)
         return nullptr;
-    napi_value result = ZipArchiveEntry::createJSEntry(env, entry, &ref);
-    m_entries_js.emplace(entry, ref);
-    return result;
+    return entry->getJSEntry(env);
 }
 
 napi_value ZipArchive::JSCreateEntry(napi_env env, napi_callback_info info) {
@@ -392,13 +429,15 @@ napi_value ZipArchive::JSCreateEntry(napi_env env, napi_callback_info info) {
 
 napi_value ZipArchive::JSClose(napi_env env, napi_callback_info info) {
     GET_ZIPARCHIVE_INFO(0)
-    archive->close();
+    archive->close(env);
     return nullptr;
 }
 
 void ZipArchive::JSDispose(napi_env env, void *data, void *hint) {
     ZipArchive *archive = static_cast<ZipArchive *>(data);
+    archive->close(env);
     delete archive;
 }
+
 
 #endif // ZIPARCHIVE_NAPI_FUNCTION

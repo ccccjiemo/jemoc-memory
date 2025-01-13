@@ -27,6 +27,7 @@ public:
         }
         m_stream->write(buffer, offset, count);
         m_position += count;
+        return count;
     }
 
     void close() override {
@@ -34,6 +35,8 @@ public:
             return;
         IStream::close();
         m_stream->close();
+        delete m_stream;
+        m_stream = nullptr;
         if (!m_everWritten) {
             m_entry->writeLocalFileHeader();
         } else {

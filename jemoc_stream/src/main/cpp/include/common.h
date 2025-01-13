@@ -14,10 +14,24 @@
 typedef unsigned char byte;
 class IStream;
 
-#define NAPI_CALL(env, func)                                                                                           \
+#define NAPI_CALL(env, func) NAPI_CALL_BASE(env, func, __LINE__)
+
+#define NAPI_CALL_BASE(env, func, line)                                                                                \
     if (napi_ok != func) {                                                                                             \
-        napi_throw_error(env, "NAPI_CALL_ERROR", #func);                                                                \
+        napi_throw_error(env, "NAPI_CALL_ERROR", #func);                                            \
     }
+
+// #define NAPI_CALL(env, call)                                                                                           \
+//     do {                                                                                                               \
+//         if (call != napi_ok) {                                                                                         \
+//             const napi_extended_error_info *error_info;                                                                \
+//             napi_get_last_error_info(env, &error_info);                                                                \
+//             const char *error_message = error_info->error_message;                                                     \
+//             char error[100] = {'\0'};                                                                                  \
+//             printf(error, "NAPI Error at line %d: %s; call %s.\n", __LINE__, error_message, #call);                   \
+//             napi_throw_error(env, "NAPI_CALL", error);                                                                 \
+//         }                                                                                                              \
+//     } while (0);
 
 #define DEFINE_NAPI_FUNCTION(name, func, getter, setter, data)                                                         \
     { name, nullptr, func, getter, setter, nullptr, napi_default, data }
@@ -126,8 +140,6 @@ static const std::string getString(napi_env env, napi_value value) {
     delete[] buffer;
     return result;
 }
-
-    
 
 
 #endif // JEMOC_STREAM_TEST_UTILS_H

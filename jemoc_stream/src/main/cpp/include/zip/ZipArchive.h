@@ -31,10 +31,12 @@ public:
     std::string getPassword() const { return m_passwd; }
     void close();
 
+
 public:
     napi_value getEntries(napi_env env);
     napi_value getEntry(napi_env env, const std::string &entryName);
     napi_value createEntry(napi_env, const std::string &entryName, int compressionLevel);
+    void close(napi_env env);
 
 public:
     static napi_value JSConstructor(napi_env env, napi_callback_info info);
@@ -56,6 +58,8 @@ private:
     void ensureCentralDirectoryRead();
     void readCentralDirectory();
     void addEntry(ZipArchiveEntry *entry);
+    void writeFile();
+    void writeArchiveEpilogue(long startOfCentralDirectory, long sizeOfCentralDirectory);
 
 private:
     IStream *m_stream = nullptr;
@@ -65,7 +69,6 @@ private:
     IStream *m_backingStream = nullptr;
     std::vector<ZipArchiveEntry *> m_entries;
     std::unordered_map<std::string, ZipArchiveEntry *> m_entriesDictionary;
-    std::unordered_map<ZipArchiveEntry *, napi_ref> m_entries_js;
     bool m_readEntries = false;
     long m_centralDirectoryStart = 0;
     uint32_t m_numberOfThisDisk = 0;

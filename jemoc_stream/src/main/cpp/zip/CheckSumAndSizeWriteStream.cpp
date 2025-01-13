@@ -8,7 +8,7 @@
 #include "zlib-ng.h"
 #include <cstdint>
 
-CheckSumAndSizeWriteStream::CheckSumAndSizeWriteStream(IStream *stream, bool leaveOpen,
+CheckSumAndSizeWriteStream::CheckSumAndSizeWriteStream(IStream *stream, IStream *baseStream, bool leaveOpen,
                                                        std::function<void(long, long, uint)> onClose) {
     if (stream == nullptr)
         throw std::ios::failure("stream is null");
@@ -21,6 +21,7 @@ CheckSumAndSizeWriteStream::CheckSumAndSizeWriteStream(IStream *stream, bool lea
     m_position = 0;
     m_onClose = onClose;
     m_leaveOpen = leaveOpen;
+    m_baseStream = baseStream;
 }
 
 
@@ -28,7 +29,7 @@ long CheckSumAndSizeWriteStream::write(void *buffer, long offset, size_t count) 
     if (count == 0)
         return 0;
     if (!m_everWritten) {
-        m_initialPosition = m_stream->getPosition();
+        m_initialPosition = m_baseStream->getPosition();
         m_everWritten = true;
     }
     m_checksum = zng_crc32_z(m_checksum, static_cast<uint8_t *>(buffer) + offset, count);
@@ -44,10 +45,10 @@ void CheckSumAndSizeWriteStream::close() {
         return;
     IStream::close();
     if (!m_everWritten)
-        m_initialPosition = m_stream->getPosition();
+        m_initialPosition = m_baseStream->getPosition();
 
     if (!m_leaveOpen)
         m_stream->close();
-
+    m_baseStream = nullptr;
     m_onClose(m_initialPosition, m_position, m_checksum);
 }

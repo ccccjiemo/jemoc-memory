@@ -12,13 +12,14 @@
 
 class CheckSumAndSizeWriteStream : public IStream {
 public:
-    CheckSumAndSizeWriteStream(IStream *stream, bool leaveOpen, std::function<void(long, long, uint)> onClose);
+    CheckSumAndSizeWriteStream(IStream *stream, IStream* baseStream ,bool leaveOpen, std::function<void(long, long, uint)> onClose);
     long write(void *buffer, long offset, size_t count) override;
     void close() override;
     void flush() override;
 
 private:
     IStream *m_stream = nullptr;
+    IStream *m_baseStream = nullptr;
     bool m_leaveOpen;
     uint m_checksum = 0;
     bool m_everWritten = false;

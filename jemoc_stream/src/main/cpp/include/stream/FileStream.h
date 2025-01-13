@@ -27,6 +27,7 @@ public:
     long read(void *buffer, long offset, size_t count) override;
     void flush() override;
     void close() override;
+    void setLength(long length) override;
 
 public:
     static std::string ClassName;

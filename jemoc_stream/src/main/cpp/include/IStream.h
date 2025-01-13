@@ -118,6 +118,7 @@ public:
     static napi_value JSGetCanSeek(napi_env env, napi_callback_info info);
     static napi_value JSGetPosition(napi_env env, napi_callback_info info);
     static napi_value JSGetLength(napi_env env, napi_callback_info info);
+    static napi_value JSSetLength(napi_env env, napi_callback_info info);
     static napi_value JSSeek(napi_env env, napi_callback_info info);
     static napi_value JSRead(napi_env env, napi_callback_info info);
     static napi_value JSWrite(napi_env env, napi_callback_info info);
@@ -129,7 +130,7 @@ public:
     static napi_value JSCopyToAsync(napi_env env, napi_callback_info info);
     static napi_value JSFlushAsync(napi_env env, napi_callback_info info);
     static napi_value JSCloseAsync(napi_env env, napi_callback_info info);
-    static napi_value JSCreateInterface(napi_env env, IStream* stream);
+    static napi_value JSCreateInterface(napi_env env, IStream *stream);
 
 
 public:
@@ -141,6 +142,7 @@ public:
     virtual bool getCanSeek() const { return m_canSeek; }
     virtual long getPosition() const { return m_position; }
     virtual long getLength() const { return m_length; }
+    virtual void setLength(long length) { throw std::ios::failure("set length not supported"); }
     virtual void copyTo(IStream *stream, long bufferSize);
     virtual long seek(long offset, SeekOrigin origin);
     virtual void flush() {}

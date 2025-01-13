@@ -18,7 +18,23 @@ MemoryStream::MemoryStream() {
     m_canGetLength = true;
 }
 
+MemoryStream::MemoryStream(size_t capacity) {
+    setCapacity(capacity);
+    m_canWrite = true;
+    m_canSeek = true;
+    m_canRead = true;
+    m_canGetPosition = true;
+    m_canGetLength = true;
+}
+
+
 MemoryStream::~MemoryStream() { close(); }
+
+void MemoryStream::setLength(long length) {
+    ensureCapacity(length);
+    m_length = length;
+    m_position = std::min(m_position, length);
+}
 
 long MemoryStream::read(void *buffer, long offset, size_t count) {
     if (count == 0)

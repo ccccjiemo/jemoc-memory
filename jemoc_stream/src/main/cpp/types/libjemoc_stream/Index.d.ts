@@ -20,6 +20,7 @@ export interface IStream {
   get position(): number;
 
   get length(): number;
+  set length(value: number);
 
   copyTo(stream: IStream, bufferSize?: number): void
 
@@ -70,6 +71,7 @@ export class MemoryStream implements IStream {
   get position(): number;
 
   get length(): number;
+  set length(value: number);
 
   copyTo(stream: IStream, bufferSize?: number | undefined): void;
 
@@ -102,6 +104,7 @@ export class FileStream implements IStream {
   get position(): number;
 
   get length(): number;
+  set length(value: number);
 
   copyTo(stream: IStream, bufferSize?: number | undefined): void;
 
@@ -138,6 +141,7 @@ export class DeflateStream implements IStream {
   get position(): number;
 
   get length(): number;
+  set length(value: number);
 
   copyTo(stream: IStream, bufferSize?: number | undefined): void;
 
@@ -179,6 +183,7 @@ export class ZipCryptoStream implements IStream {
   get position(): number;
 
   get length(): number;
+  set length(value: number);
 
   copyTo(stream: IStream, bufferSize?: number | undefined): void;
 

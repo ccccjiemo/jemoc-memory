@@ -139,5 +139,15 @@ napi_value FileStream::JSConstructor(napi_env env, napi_callback_info info) {
 void FileStream::JSDispose(napi_env env, void *data, void *hint) {
     FileStream *stream = static_cast<FileStream *>(data);
     stream->close();
+
     delete stream;
+}
+
+void FileStream::setLength(long length) {
+    if (-1 == ftruncate(fileno(file), length)) {
+        throw std::ios::failure("set length failed");
+    }
+
+    m_position = std::min(length, m_position);
+    m_length = length;
 }

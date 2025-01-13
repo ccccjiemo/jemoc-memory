@@ -1,4 +1,5 @@
 export {
+  IStream,
   MemoryStream,
   FileStream,
   ZipCryptoStream,

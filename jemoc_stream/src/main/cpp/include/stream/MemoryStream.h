@@ -14,12 +14,15 @@
 class MemoryStream : public IStream {
 public:
     MemoryStream();
+    MemoryStream(size_t capacity);
     ~MemoryStream();
     long read(void *buffer, long offset, size_t count) override;
     long write(void *buffer, long offset, size_t count) override;
     void setCapacity(long capacity);
     long getCapacity() const;
     void close() override;
+    void setLength(long length) override;
+    const byte *getData() const { return m_cache.data(); }
 
 
 public:

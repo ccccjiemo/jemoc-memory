@@ -122,6 +122,19 @@ napi_value IStream::JSRead(napi_env env, napi_callback_info info) {
     RETURN_NAPI_VALUE(napi_create_int64, readBytes)
 }
 
+napi_value IStream::JSSetLength(napi_env env, napi_callback_info info) {
+    GET_JS_INFO(1)
+    long length = getLong(env, argv[0]);
+
+    try {
+        stream->setLength(length);
+    } catch (const std::exception &e) {
+        napi_throw_error(env, tagName, e.what());
+    }
+    return nullptr;
+}
+
+
 napi_value IStream::JSWrite(napi_env env, napi_callback_info info) {
     GET_JS_INFO(3)
     if (!stream->getCanWrite()) {
@@ -162,6 +175,7 @@ napi_value IStream::JSClose(napi_env env, napi_callback_info info) {
     if (stream == nullptr) {
         napi_throw_error(env, tagName, "stream is null");
     }
+    stream->close();
     return nullptr;
 }
 
