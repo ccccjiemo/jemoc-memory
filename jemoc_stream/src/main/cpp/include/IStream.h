@@ -28,6 +28,10 @@ struct AsyncWorkData {
     napi_async_work work;
 };
 
+#define GET_JS_INFO_WITHOUT_CHECK(count)                                                                               \
+    GET_JS_INFO_WITHOUT_STREAM(count)                                                                                  \
+    IStream *stream = getStream(env, _this);
+
 
 #define GET_JS_INFO_WITHOUT_STREAM(count)                                                                              \
     napi_value _this = nullptr;                                                                                        \
@@ -60,10 +64,23 @@ struct AsyncWorkData {
         RETURN_NAPI_VALUE(napi_get_boolean, stream->func1());                                                          \
     }
 
+#define DEFINE_ISTREAM_GET_STATE(jsfunc, funname)                                                                      \
+    napi_value IStream::jsfunc(napi_env env, napi_callback_info info) {                                                \
+        GET_JS_INFO_WITHOUT_CHECK(0)                                                                                   \
+        bool value = false;                                                                                            \
+        if (!(stream == nullptr || stream->isClose())) {                                                               \
+            value = stream->funname();                                                                                 \
+        }                                                                                                              \
+        napi_value result = nullptr;                                                                                   \
+        NAPI_CALL(env, napi_get_boolean(env, value, &result))                                                          \
+        return result;                                                                                                 \
+    }
+
+
 #define DEFINE_ISTREAM_GET_LONG_FUNCTION(func, func1)                                                                  \
     napi_value IStream::func(napi_env env, napi_callback_info info) {                                                  \
-        GET_JS_INFO(0)                                                                                                 \
-        if (stream->isClose()) {                                                                                       \
+        GET_JS_INFO_WITHOUT_CHECK(0)                                                                                   \
+        if (stream == nullptr || stream->isClose()) {                                                                  \
             napi_throw_error(env, tagName, "stream is closed");                                                        \
         }                                                                                                              \
         try {                                                                                                          \
@@ -73,8 +90,8 @@ struct AsyncWorkData {
             return result;                                                                                             \
         } catch (const std::ios_base::failure &e) {                                                                    \
             napi_throw_error(env, tagName, e.what());                                                                  \
-            return nullptr;                                                                                            \
         }                                                                                                              \
+        return nullptr;                                                                                                \
     }
 
 #define DEFINE_ISTREAM_SET_FUNC(func, func1)                                                                           \
@@ -91,7 +108,7 @@ struct AsyncWorkData {
         DEFINE_NAPI_FUNCTION("canWrite", nullptr, IStream::JSGetCanWrite, nullptr, className),                         \
         DEFINE_NAPI_FUNCTION("canSeek", nullptr, IStream::JSGetCanSeek, nullptr, className),                           \
         DEFINE_NAPI_FUNCTION("position", nullptr, IStream::JSGetPosition, nullptr, className),                         \
-        DEFINE_NAPI_FUNCTION("length", nullptr, IStream::JSGetLength, nullptr, className),                             \
+        DEFINE_NAPI_FUNCTION("length", nullptr, IStream::JSGetLength, IStream::JSSetLength, className),                \
         DEFINE_NAPI_FUNCTION("copyTo", IStream::JSCopyTo, nullptr, nullptr, className),                                \
         DEFINE_NAPI_FUNCTION("seek", IStream::JSSeek, nullptr, nullptr, className),                                    \
         DEFINE_NAPI_FUNCTION("read", IStream::JSRead, nullptr, nullptr, className),                                    \
@@ -102,7 +119,9 @@ struct AsyncWorkData {
         DEFINE_NAPI_FUNCTION("writeAsync", IStream::JSWriteAsync, nullptr, nullptr, className),                        \
         DEFINE_NAPI_FUNCTION("copyToAsync", IStream::JSCopyToAsync, nullptr, nullptr, className),                      \
         DEFINE_NAPI_FUNCTION("flushAsync", IStream::JSFlushAsync, nullptr, nullptr, className),                        \
-        DEFINE_NAPI_FUNCTION("closeAsync", IStream::JSCloseAsync, nullptr, nullptr, className)
+        DEFINE_NAPI_FUNCTION("closeAsync", IStream::JSCloseAsync, nullptr, nullptr, className),                        \
+        DEFINE_NAPI_FUNCTION("isClosed", nullptr, IStream::JSGetIsClosed, nullptr, className)
+
 
 #define CHECK_STREAM                                                                                                   \
     if (stream->isClose()) {                                                                                           \
@@ -130,6 +149,7 @@ public:
     static napi_value JSCopyToAsync(napi_env env, napi_callback_info info);
     static napi_value JSFlushAsync(napi_env env, napi_callback_info info);
     static napi_value JSCloseAsync(napi_env env, napi_callback_info info);
+    static napi_value JSGetIsClosed(napi_env env, napi_callback_info info);
     static napi_value JSCreateInterface(napi_env env, IStream *stream);
 
 

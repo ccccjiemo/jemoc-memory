@@ -218,8 +218,22 @@ interface ZipArchiveOption {
 export class ZipArchiveEntry {
   private constructor()
   open(): IStream
-  close(): void
+  delete(): void
   get fullName(): string
+  set fullName(value: string)
+  get isEncrypted(): boolean
+  set isEncrypted(value: boolean)
+  get compressionLevel(): number
+  set compressionLevel(value: number)
+  get compressionMethod(): number
+  set compressionMethod(value: number)
+  get fileComment(): string
+  set fileComment(value: string)
+  get lastModifer(): Date
+  set lastModifer(value: Date)
+  get crc32(): number
+  get isOpened(): boolean
+  get isDeleted(): boolean
 
 }
 

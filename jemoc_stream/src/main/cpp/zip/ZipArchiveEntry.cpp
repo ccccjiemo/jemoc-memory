@@ -15,6 +15,7 @@
 #include "stream/DeflateStream.h"
 #include "zip/CheckSumAndSizeWriteStream.h"
 
+
 static ushort mapCompressionLevel(ushort flag, ushort compressionMethod) {
     if (compressionMethod == CompressionMethod::Deflate || compressionMethod == CompressionMethod::Deflate64) {
         ushort level = flag & 0x6;
@@ -57,8 +58,7 @@ ZipArchiveEntry::ZipArchiveEntry(ZipArchive *archive, const ZipCentralDirectoryR
     flags = record.flags;
     isEncrypted = (flags & GeneralPurposeBitFlag_IsEncrypted) != 0;
     compressionMethod = record.compression;
-    fileTime = record.fileTime;
-    fileDate = record.fileDate;
+    lastModifier = record.lastModifier;
     compressedSize = record.compressedSize;
     uncompressedSize = record.uncompressedSize;
     externalFileAttr = record.externalAttributes;
@@ -67,13 +67,19 @@ ZipArchiveEntry::ZipArchiveEntry(ZipArchive *archive, const ZipCentralDirectoryR
     m_compression_level = mapCompressionLevel(flags, compressionMethod);
 
     fileName = new char[record.fileNameLength];
+    fileNameLength = record.fileNameLength;
+    extraFieldLength = record.extraFieldLength;
+    fileCommentLength = record.fileCommentLength;
     archive->getArchiveStream()->read(fileName, 0, record.fileNameLength);
-    fields = ZipGenericExtraField::tryRead(archive->getArchiveStream(), record.extraFieldLength);
+    if (record.extraFieldLength > 0) {
+        cdExtraFields = new byte[record.extraFieldLength];
+        archive->getArchiveStream()->read(cdExtraFields, 0, record.extraFieldLength);
+        fields = ZipGenericExtraField::tryRead(cdExtraFields, record.extraFieldLength);
+    }
     if (record.fileCommentLength > 0) {
         fileComment = new char[record.fileCommentLength];
         archive->getArchiveStream()->read(fileComment, 0, record.fileCommentLength);
     }
-
     if (flags & GeneralPurposeBitFlag_DataDescriptor) {
         ZipDataDescriptor descriptor;
         if (ZipDataDescriptor::tryRead(archive->getArchiveStream(), &descriptor)) {
@@ -88,35 +94,104 @@ ZipArchiveEntry::ZipArchiveEntry(ZipArchive *archive, const ZipCentralDirectoryR
 ZipArchiveEntry::ZipArchiveEntry(ZipArchive *archive, const std::string &entryName, int compressionLevel) {
     m_compression_level = compressionLevel;
     m_archive = archive;
-    if (m_compression_level == CompressionLevel_NoCompression) {
-        compressionMethod = CompressionMethod::Stored;
-    }
+
+    compressionMethod =
+        m_compression_level == CompressionLevel_NoCompression ? CompressionMethod::Stored : CompressionMethod::Deflate;
     diskNumberStart = 0;
-    versionMadeBy = 20;
+    versionMadeBy = 20 | 3 << 8;
     versionToExtract = 20;
     flags = 0;
-    isEncrypted = (flags & GeneralPurposeBitFlag_IsEncrypted) != 0;
-    compressionMethod = CompressionMethod::Stored;
-    fileTime = 0;
-    fileDate = 0;
+    lastModifier = 0;
     compressedSize = 0;
     uncompressedSize = 0;
     externalFileAttr = 0;
     headerOffset = 0;
     setFullName(entryName);
-//     fileName = (char *)entryName.c_str();
-//     fileNameLength = entryName.length();
+    setLastModifier(get_current_unix_timestamp());
     fileCommentLength = 0;
     crc = 0;
     m_originallyInArchive = false;
     m_stored_fullname = entryName;
 }
 
+ZipArchiveEntry::~ZipArchiveEntry() {
+    if (!fields.empty()) {
+        for (auto field = fields.begin(); field != fields.end(); field++) {
+            delete (*field);
+        }
+        fields.clear();
+    }
+    if (fileName != nullptr) {
+        delete[] fileName;
+        fileName = nullptr;
+    }
+    if (fileComment != nullptr) {
+        delete[] fileComment;
+        fileComment = nullptr;
+    }
+
+    if (m_outstandingWriteStream != nullptr) {
+        m_outstandingWriteStream->close();
+        delete m_outstandingWriteStream;
+        m_outstandingWriteStream = nullptr;
+    }
+    if (compressedBytes != nullptr) {
+        compressedBytes->close();
+        delete compressedBytes;
+        compressedBytes = nullptr;
+    }
+    if (uncompressedData != nullptr) {
+        uncompressedData->close();
+        delete uncompressedData;
+        uncompressedData = nullptr;
+    }
+    if (cdExtraFields != nullptr) {
+        delete[] cdExtraFields;
+        cdExtraFields = nullptr;
+    }
+    if (lfExtraFields != nullptr) {
+        delete[] lfExtraFields;
+        lfExtraFields = nullptr;
+    }
+}
+
+bool ZipArchiveEntry::getIsEncrypted() const { return flags & GeneralPurposeBitFlag_IsEncrypted; }
+void ZipArchiveEntry::setIsEncrypted(const bool &value) {
+    flags = flags & ~GeneralPurposeBitFlag_IsEncrypted | value;
+    if (value) {
+        setHasDataDescriptor(true);
+    }
+}
+CompressionLevel ZipArchiveEntry::getCompressionLevel() const { return CompressionLevel((flags & 0x6) >> 1); }
+void ZipArchiveEntry::setCompressionLevel(CompressionLevel level) { flags = flags & 0xf9 | (level << 1); }
+bool ZipArchiveEntry::getHasDataDescriptor() const { return flags & GeneralPurposeBitFlag_DataDescriptor; }
+void ZipArchiveEntry::setHasDataDescriptor(bool value) {
+    flags = flags & ~GeneralPurposeBitFlag_DataDescriptor | (value << 3);
+}
+std::string ZipArchiveEntry::getComment() const { return fileComment == nullptr ? "" : std::string(fileComment); }
+void ZipArchiveEntry::setComment(const std::string &comment) {
+    fileCommentLength = comment.length();
+    if (fileComment != nullptr) {
+        delete fileComment;
+        fileComment = nullptr;
+    }
+    if (fileCommentLength > 0) {
+        fileComment = new char[fileCommentLength];
+        memcpy(fileComment, comment.c_str(), comment.length());
+    }
+}
+
+void ZipArchiveEntry::setCompressionMethod(CompressionMethod value) { compressionMethod = value; }
+
+double ZipArchiveEntry::getLastModifier() const { return dostime_to_unix_timestamp(lastModifier); }
+void ZipArchiveEntry::setLastModifier(double value) { lastModifier = unix_timestamp_to_dostime(value); }
+uint ZipArchiveEntry::getCryptCRC() const { return getHasDataDescriptor() ? lastModifier << 16 : crc << 16; }
+
 std::string ZipArchiveEntry::getFullName() {
     if (m_stored_fullname.length() == 0) {
         for (auto it = fields.begin(); it != fields.end(); ++it) {
-            if (it->tag == 0x7075) {
-                m_stored_fullname = std::string((char *)it->data);
+            if ((*it)->tag == 0x7075) {
+                m_stored_fullname = std::string((char *)(*it)->data);
                 break;
             }
         }
@@ -149,17 +224,31 @@ IStream *ZipArchiveEntry::open() {
     }
 }
 
+void ZipArchiveEntry::Delete() {
+    if (m_archive->isClosed())
+        return;
+    if (m_currentlyOpenForWrite)
+        throw std::ios::failure("cannot delete an entry currently open for writing.");
+    if (m_archive->getMode() != ZipArchiveMode_Update)
+        throw std::ios::failure("delete can only be used when the archive is in update mode.");
+    m_archive->removeEntry(this);
+    m_archive = nullptr;
+}
+
+
 void ZipArchiveEntry::setFullName(const std::string &entryName) {
     m_stored_fullname = entryName;
     fileNameLength = m_stored_fullname.length();
-    fileName = (char *)m_stored_fullname.c_str();
+    fileName = new char[fileNameLength];
+    memcpy(fileName, m_stored_fullname.c_str(), fileNameLength);
 }
 
 IStream *ZipArchiveEntry::openInReadMode() {
     IStream *stream =
         new SubReadStream(m_archive->getArchiveStream(), getOffsetOfCompressedData(), compressedSize, true);
-    if (flags & GeneralPurposeBitFlag_IsEncrypted) {
-        stream = new ZipCryptoStream(stream, CryptoMode_Decode, m_archive->getPassword(), false, crc);
+    if (getIsEncrypted()) {
+        stream = new ZipCryptoStream(stream, CryptoMode_Decode, this, false);
+//         stream = new ZipCryptoStream(stream, CryptoMode_Decode, m_archive->getPassword(), false, crc);
     }
     return getDataDecompressor(stream);
 }
@@ -167,12 +256,11 @@ IStream *ZipArchiveEntry::openInReadMode() {
 IStream *ZipArchiveEntry::openInUpdateMode() {
     if (m_currentlyOpenForWrite)
         throw std::ios::failure("entries cannot be opened multiple times in update mode.");
-
     m_everOpenedForWrite = true;
     m_currentlyOpenForWrite = true;
     IStream *stream = getUncompressedData();
     stream->seek(0, SeekOrigin::Begin);
-    return new WrappedStream(stream, true, [this]() { this->m_currentlyOpenForWrite = false; });
+    return new WrappedStream(stream, this, true, [this]() { this->m_currentlyOpenForWrite = false; });
 }
 
 IStream *ZipArchiveEntry::getUncompressedData() {
@@ -188,7 +276,7 @@ IStream *ZipArchiveEntry::getUncompressedData() {
                 uncompressedData = nullptr;
                 m_currentlyOpenForWrite = false;
                 m_everOpenedForWrite = false;
-                throw std::ios::failure("open failed");
+                throw e;
             }
         }
     }
@@ -197,41 +285,42 @@ IStream *ZipArchiveEntry::getUncompressedData() {
 
 
 IStream *ZipArchiveEntry::getDataDecompressor(IStream *stream) {
+    IStream *decompressor = stream;
     if (compressionMethod == CompressionMethod::Deflate || compressionMethod == CompressionMethod::Deflate64) {
-        return new DeflateStream(stream, DeflateMode_Decompress, -15, m_compression_level, false, 4096,
-                                 uncompressedSize);
+        decompressor =
+            new DeflateStream(stream, DeflateMode_Decompress, -15, m_compression_level, false, 4096, uncompressedSize);
     }
-    return stream;
+    if (getIsEncrypted()) {
+        decompressor = new ZipCryptoStream(decompressor, CryptoMode_Decode, m_archive->getPassword(), false, crc, 4096);
+    }
+    return decompressor;
 }
 
 IStream *ZipArchiveEntry::getDataCompressor(IStream *stream, bool leaveOpen) {
     IStream *compressorStream = stream;
     ZipCryptoStream *cryptoStream = nullptr;
     bool isBase = true;
-    if (flags & GeneralPurposeBitFlag_IsEncrypted) {
-        compressorStream = new ZipCryptoStream(stream, CryptoMode_Encode, m_archive->getPassword(), leaveOpen, 0, 4096);
+    if (getIsEncrypted()) {
+        cryptoStream = new ZipCryptoStream(stream, CryptoMode_Encode, this, leaveOpen);
+        compressorStream = cryptoStream;
         isBase = false;
     }
     switch (compressionMethod) {
     case CompressionMethod::Stored:
-        compressorStream = stream;
         break;
     case CompressionMethod::Deflate:
     case CompressionMethod::Deflate64:
     default:
-        compressorStream = new DeflateStream(stream, DeflateMode_Compress, -15,
-                                             getZlibCompressionLevel(CompressionLevel(m_compression_level)),
-                                             isBase ? leaveOpen && true : false);
+        compressorStream =
+            new DeflateStream(compressorStream, DeflateMode_Compress, -15,
+                              getZlibCompressionLevel(getCompressionLevel()), isBase ? leaveOpen && true : false);
         isBase = false;
         break;
     }
 
     CheckSumAndSizeWriteStream *checkSumStream =
         new CheckSumAndSizeWriteStream(compressorStream, stream, isBase ? leaveOpen && true : false,
-                                       [this, cryptoStream](long initialPosition, long currentPosition, uint checkSum) {
-                                           if (cryptoStream != nullptr) {
-                                               cryptoStream->setCRC(checkSum);
-                                           }
+                                       [this](long initialPosition, long currentPosition, uint checkSum) {
                                            crc = checkSum;
                                            uncompressedSize = currentPosition;
                                            compressedSize =
@@ -260,17 +349,17 @@ bool ZipArchiveEntry::writeLocalFileHeader() {
     header.version = versionToExtract;
     header.flags = flags;
     header.compression = uncompressedSize == 0 ? CompressionLevel_NoCompression : compressionMethod;
-    header.lastModifier = fileTime | fileDate << 16;
+    header.lastModifier = lastModifier;
     header.crc = crc;
     header.compressedSize = compressedSize;
     header.uncompressedSize = uncompressedSize;
     header.fileNameLength = fileNameLength;
-    header.extraFieldLength = extraFieldLength;
+    header.extraFieldLength = lfExtraFieldsLength;
     IStream *stream = m_archive->getArchiveStream();
     stream->write(&header, 0, sizeof(header));
     stream->write(fileName, 0, fileNameLength);
-    if (extraFieldLength > 0) {
-        stream->write(extraField, 0, extraFieldLength);
+    if (lfExtraFieldsLength > 0) {
+        stream->write(lfExtraFields, 0, lfExtraFieldsLength);
     }
     return true;
 }
@@ -310,6 +399,10 @@ void ZipArchiveEntry::writeAndFinishLocalEntry() {
 void ZipArchiveEntry::writeLocalFileHeaderAndDataIfNeeded() {
     if (uncompressedData != nullptr) {
         uncompressedSize = uncompressedData->getLength();
+        lastModifier = get_current_dostime();
+        if (getIsEncrypted()) {
+            setIsEncrypted(true);
+        }
         IStream *entryWriter =
             new DirectToArchiveWriterStream(getDataCompressor(m_archive->getArchiveStream(), true), this);
         uncompressedData->seek(0, SeekOrigin::Begin);
@@ -336,7 +429,18 @@ void ZipArchiveEntry::writeLocalFileHeaderAndDataIfNeeded() {
 
 void ZipArchiveEntry::loadLocalHeaderExtraFieldAndCompressedBytesIfNeeded() {
     if (m_originallyInArchive) {
-        m_archive->getArchiveStream()->seek(headerOffset + 30 + fileNameLength, SeekOrigin::Begin);
+        // 跳转28字节获取localfileheader中的extra_field长度
+        m_archive->getArchiveStream()->seek(headerOffset + 28, SeekOrigin::Begin);
+        ushort extraFieldLength = 0;
+        m_archive->getArchiveStream()->read(&extraFieldLength, 0, 2);
+        m_archive->getArchiveStream()->seek(fileNameLength, SeekOrigin::Current);
+        if (lfExtraFields != nullptr) {
+            delete[] lfExtraFields;
+            lfExtraFields = nullptr;
+        }
+        lfExtraFields = new byte[extraFieldLength];
+        lfExtraFieldsLength = extraFieldLength;
+        m_archive->getArchiveStream()->read(lfExtraFields, 0, lfExtraFieldsLength);
     }
 
     if (!m_everOpenedForWrite && m_originallyInArchive) {
@@ -360,14 +464,13 @@ void ZipArchiveEntry::loadLocalHeaderExtraFieldAndCompressedBytesIfNeeded() {
 
 
 void ZipArchiveEntry::writeCentralDirectoryFileHeader() {
-    ZipCentralDirectoryRecord record{};
+    ZipCentralDirectoryRecord record{0};
     record.signature = ZIP_CentralDirectory_SIGNATURE;
     record.versionMadeBy = versionMadeBy;
     record.versionToExtract = versionToExtract;
     record.flags = flags;
     record.compression = compressionMethod;
-    record.fileTime = fileTime;
-    record.fileDate = fileDate;
+    record.lastModifier = lastModifier;
     record.crc = crc;
     record.compressedSize = compressedSize;
     record.uncompressedSize = uncompressedSize;
@@ -382,7 +485,7 @@ void ZipArchiveEntry::writeCentralDirectoryFileHeader() {
     stream->write(&record, 0, sizeof(record));
     stream->write(fileName, 0, fileNameLength);
     if (extraFieldLength > 0) {
-        stream->write(extraField, 0, extraFieldLength);
+        stream->write(cdExtraFields, 0, extraFieldLength);
     }
     if (fileCommentLength > 0) {
         stream->write(fileComment, 0, fileCommentLength);
@@ -423,6 +526,15 @@ napi_ref ZipArchiveEntry::cons = nullptr;
 void ZipArchiveEntry::Export(napi_env env, napi_value exports) {
     napi_property_descriptor desc[] = {
         DEFINE_NAPI_FUNCTION("open", JSOpen, nullptr, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("isEncrypted", nullptr, JSGetIsEncrypted, JSSetIsEncrypted, nullptr),
+        DEFINE_NAPI_FUNCTION("compressionLevel", nullptr, JSGetCompressionLevel, JSSetCompressionLevel, nullptr),
+        DEFINE_NAPI_FUNCTION("fileComment", nullptr, JSGetFileComment, JSSetFileComment, nullptr),
+        DEFINE_NAPI_FUNCTION("fullName", nullptr, JSGetFullName, JSSetFullName, nullptr),
+        DEFINE_NAPI_FUNCTION("compressionMethod", nullptr, JSGetCompressionMethod, JSSetCompressionMethod, nullptr),
+        DEFINE_NAPI_FUNCTION("lastModifier", nullptr, JSGetLastModifier, JSSetLastModifier, nullptr),
+        DEFINE_NAPI_FUNCTION("isOpened", nullptr, JSGetIsOpened, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("crc32", nullptr, JSGetCRC, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("delete", JSDelete, nullptr, nullptr, nullptr),
     };
     napi_value napi_cons = nullptr;
     NAPI_CALL(env, napi_define_class(env, ClassName.c_str(), NAPI_AUTO_LENGTH, JSConstructor, nullptr,
@@ -447,7 +559,11 @@ ZipArchiveEntry *ZipArchiveEntry::getEntry(napi_env env, napi_value value) {
     return static_cast<ZipArchiveEntry *>(result);
 }
 
-void ZipArchiveEntry::JSDispose(napi_env env, void *data, void *hint) {}
+void ZipArchiveEntry::JSDispose(napi_env env, void *data, void *hint) {
+    ZipArchiveEntry *entry = static_cast<ZipArchiveEntry *>(data);
+    delete entry;
+    entry = nullptr;
+}
 
 napi_value ZipArchiveEntry::open(napi_env env) {
     IStream *stream = open();
@@ -462,7 +578,7 @@ napi_value ZipArchiveEntry::JSOpen(napi_env env, napi_callback_info info) {
     try {
         return entry->open(env);
     } catch (const std::exception &e) {
-        napi_throw_error(env, "ZipArchiveEntry", e.what());
+        napi_throw_error(env, "ZipArchiveEntry", (std::string("open failed: ") + e.what()).c_str());
     }
     return nullptr;
 }
@@ -497,6 +613,144 @@ void ZipArchiveEntry::releaseJSEntry(napi_env env) {
     }
 
     jsEntry = nullptr;
+}
+
+napi_value ZipArchiveEntry::JSSetIsEncrypted(napi_env env, napi_callback_info info) {
+    GET_ZIPARCHIVE_ENTRY_INFO_WITH_ENTRY(1)
+    if (entry->m_archive->getMode() == ZipArchiveMode_Read)
+        napi_throw_error(env, ClassName.c_str(), "can not set isEncrypted in read mode.");
+    if (entry->m_everOpenedForWrite)
+        napi_throw_error(env, ClassName.c_str(), "can not set isEncrypted after open.");
+    bool isEncrypted = false;
+    NAPI_CALL(env, napi_get_value_bool(env, argv[0], &isEncrypted))
+    entry->setIsEncrypted(isEncrypted);
+    return nullptr;
+}
+
+napi_value ZipArchiveEntry::JSGetIsEncrypted(napi_env env, napi_callback_info info) {
+    GET_ZIPARCHIVE_ENTRY_INFO_WITH_ENTRY(0)
+    napi_value result = nullptr;
+    NAPI_CALL(env, napi_get_boolean(env, entry->getIsEncrypted(), &result))
+    return result;
+}
+
+napi_value ZipArchiveEntry::JSGetCompressionLevel(napi_env env, napi_callback_info info) {
+    GET_ZIPARCHIVE_ENTRY_INFO_WITH_ENTRY(0)
+    napi_value result = nullptr;
+    NAPI_CALL(env, napi_create_int32(env, entry->getCompressionLevel(), &result))
+    return result;
+}
+
+napi_value ZipArchiveEntry::JSSetCompressionLevel(napi_env env, napi_callback_info info) {
+    GET_ZIPARCHIVE_ENTRY_INFO_WITH_ENTRY(1)
+    if (entry->m_archive->getMode() == ZipArchiveMode_Read)
+        napi_throw_error(env, ClassName.c_str(), "can not set compression level in read mode.");
+    if (entry->m_everOpenedForWrite)
+        napi_throw_error(env, ClassName.c_str(), "can not set compression level after open.");
+    int level = 0;
+    NAPI_CALL(env, napi_get_value_int32(env, argv[0], &level))
+    entry->setCompressionLevel(CompressionLevel(level));
+    return nullptr;
+}
+
+napi_value ZipArchiveEntry::JSSetFileComment(napi_env env, napi_callback_info info) {
+    GET_ZIPARCHIVE_ENTRY_INFO_WITH_ENTRY(1)
+    if (entry->m_archive->getMode() == ZipArchiveMode_Read)
+        napi_throw_error(env, ClassName.c_str(), "can not set file comment in read mode.");
+    std::string comment = getString(env, argv[0]);
+    entry->setComment(comment);
+    return nullptr;
+}
+
+napi_value ZipArchiveEntry::JSGetFileComment(napi_env env, napi_callback_info info) {
+    GET_ZIPARCHIVE_ENTRY_INFO_WITH_ENTRY(1)
+    napi_value result = nullptr;
+    NAPI_CALL(env, napi_create_string_utf8(env, entry->getComment().c_str(), NAPI_AUTO_LENGTH, &result))
+    return result;
+}
+
+napi_value ZipArchiveEntry::JSGetFullName(napi_env env, napi_callback_info info) {
+    GET_ZIPARCHIVE_ENTRY_INFO_WITH_ENTRY(1)
+    napi_value result = nullptr;
+    NAPI_CALL(env, napi_create_string_utf8(env, entry->getFullName().c_str(), NAPI_AUTO_LENGTH, &result))
+    return result;
+}
+napi_value ZipArchiveEntry::JSSetFullName(napi_env env, napi_callback_info info) {
+    GET_ZIPARCHIVE_ENTRY_INFO_WITH_ENTRY(1)
+    if (entry->m_archive->getMode() == ZipArchiveMode_Read)
+        napi_throw_error(env, ClassName.c_str(), "can not set fullName in read mode.");
+    std::string name = getString(env, argv[0]);
+    entry->setFullName(name);
+    return nullptr;
+}
+napi_value ZipArchiveEntry::JSGetCompressionMethod(napi_env env, napi_callback_info info) {
+    GET_ZIPARCHIVE_ENTRY_INFO_WITH_ENTRY(0)
+    napi_value result = nullptr;
+    NAPI_CALL(env, napi_create_int32(env, entry->getCompressionMethod(), &result))
+    return result;
+}
+napi_value ZipArchiveEntry::JSSetCompressionMethod(napi_env env, napi_callback_info info) {
+    GET_ZIPARCHIVE_ENTRY_INFO_WITH_ENTRY(1)
+    if (entry->m_archive->getMode() == ZipArchiveMode_Read)
+        napi_throw_error(env, ClassName.c_str(), "can not set compression method in read mode.");
+    if (entry->m_everOpenedForWrite)
+        napi_throw_error(env, ClassName.c_str(), "can not set compression method after open.");
+    int method = 0;
+    NAPI_CALL(env, napi_get_value_int32(env, argv[0], &method))
+    entry->setCompressionMethod(CompressionMethod(method));
+    return nullptr;
+}
+napi_value ZipArchiveEntry::JSSetLastModifier(napi_env env, napi_callback_info info) {
+    GET_ZIPARCHIVE_ENTRY_INFO_WITH_ENTRY(1)
+    double timestamp = 0;
+    NAPI_CALL(env, napi_get_date_value(env, argv[0], &timestamp))
+    entry->setLastModifier(timestamp);
+    return nullptr;
+}
+
+napi_value ZipArchiveEntry::JSGetLastModifier(napi_env env, napi_callback_info info) {
+    GET_ZIPARCHIVE_ENTRY_INFO_WITH_ENTRY(0)
+    napi_value result = nullptr;
+    NAPI_CALL(env, napi_create_date(env, entry->getLastModifier(), &result))
+    return result;
+}
+
+napi_value ZipArchiveEntry::JSGetIsOpened(napi_env env, napi_callback_info info) {
+    GET_ZIPARCHIVE_ENTRY_INFO_WITH_ENTRY(0)
+    napi_value result = nullptr;
+    NAPI_CALL(env, napi_get_boolean(env, entry->m_everOpenedForWrite, &result))
+    return result;
+}
+
+napi_value ZipArchiveEntry::JSGetCRC(napi_env env, napi_callback_info info) {
+    GET_ZIPARCHIVE_ENTRY_INFO_WITH_ENTRY(0)
+    napi_value result = nullptr;
+    NAPI_CALL(env, napi_create_uint32(env, entry->crc, &result))
+    return result;
+}
+
+void ZipArchiveEntry::Delete(napi_env env) {
+    Delete();
+    releaseJSEntry(env);
+}
+
+napi_value ZipArchiveEntry::JSDelete(napi_env env, napi_callback_info info) {
+    GET_ZIPARCHIVE_ENTRY_INFO_WITH_ENTRY(0)
+    try {
+        entry->Delete(env);
+    } catch (const std::exception &e) {
+        napi_throw_error(env, ClassName.c_str(), e.what());
+    }
+    return nullptr;
+}
+
+napi_value ZipArchiveEntry::JSGetIsDeleted(napi_env env, napi_callback_info info) {
+    GET_ZIPARCHIVE_ENTRY_INFO(0)
+    ZipArchiveEntry *entry = getEntry(env, _this);
+    bool value = entry == nullptr;
+    napi_value result = nullptr;
+    NAPI_CALL(env, napi_get_boolean(env, value, &result))
+    return result;
 }
 
 

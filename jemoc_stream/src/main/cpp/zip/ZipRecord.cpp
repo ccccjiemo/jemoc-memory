@@ -39,25 +39,30 @@ bool ZipCentralDirectoryRecord::tryReadRecord(IStream *stream, bool saveExtraFie
     return true;
 }
 
-std::vector<ZipGenericExtraField> ZipGenericExtraField::tryRead(IStream *stream, size_t size) {
-    std::vector<ZipGenericExtraField> list;
-    uint8_t *buffer = new uint8_t[size];
-    stream->read(buffer, 0, size);
+std::vector<ZipGenericExtraField *> ZipGenericExtraField::tryRead(void *buffer, size_t size) {
+    std::vector<ZipGenericExtraField *> list;
+    uint8_t *_buffer = static_cast<uint8_t *>(buffer);
     long pointer = 0;
     while (pointer + 4 < size) {
-        ZipGenericExtraField field;
-        memcpy(&field, buffer + pointer, 4);
+        ZipGenericExtraField *field = new ZipGenericExtraField{0};
+        memcpy(field, _buffer + pointer, 4);
         pointer += 4;
-        if (field.size > size - pointer)
+        if (field->size > size - pointer)
             break;
-        field.data = new uint8_t[field.size];
-        memcpy(field.data, buffer + pointer, field.size);
-        pointer += field.size;
+        field->data = new uint8_t[field->size];
+        memcpy(field->data, _buffer + pointer, field->size);
+        pointer += field->size;
         list.push_back(field);
     }
-    delete[] buffer;
     return list;
 }
+ZipGenericExtraField::~ZipGenericExtraField() {
+    if (data != nullptr) {
+        delete[] data;
+        data = nullptr;
+    }
+}
+
 
 bool ZipDataDescriptor::tryRead(IStream *stream, ZipDataDescriptor *descriptor) {
     stream->read(descriptor, 0, sizeof(ZipDataDescriptor));

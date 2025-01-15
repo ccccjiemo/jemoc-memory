@@ -46,9 +46,12 @@ void CheckSumAndSizeWriteStream::close() {
     IStream::close();
     if (!m_everWritten)
         m_initialPosition = m_baseStream->getPosition();
-
-    if (!m_leaveOpen)
+  if (!m_leaveOpen) {
         m_stream->close();
+        delete m_stream;
+        m_stream = nullptr;
+    }
     m_baseStream = nullptr;
     m_onClose(m_initialPosition, m_position, m_checksum);
+  
 }

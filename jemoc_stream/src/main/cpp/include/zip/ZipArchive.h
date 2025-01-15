@@ -30,6 +30,7 @@ public:
     IStream *getArchiveStream() { return m_stream; }
     std::string getPassword() const { return m_passwd; }
     void close();
+    bool isClosed() const { return m_close; }
 
 
 public:
@@ -37,6 +38,7 @@ public:
     napi_value getEntry(napi_env env, const std::string &entryName);
     napi_value createEntry(napi_env, const std::string &entryName, int compressionLevel);
     void close(napi_env env);
+    void removeEntry(ZipArchiveEntry *entry);
 
 public:
     static napi_value JSConstructor(napi_env env, napi_callback_info info);
@@ -52,6 +54,7 @@ public:
     static std::string ClassName;
     static napi_ref cons;
     static ZipArchive *getZipArchive(napi_env env, napi_value value);
+    static napi_value JSGetIsClosed(napi_env env, napi_callback_info info);
 
 private:
     void readEndOfCentralDirectory();

@@ -45,14 +45,26 @@ class ZipArchiveEntry {
 public:
     ZipArchiveEntry(ZipArchive *archive, const ZipCentralDirectoryRecord &record);
     ZipArchiveEntry(ZipArchive *archive, const std::string &entryName, int compressionLevel);
+    ~ZipArchiveEntry();
 
+    IStream *open();
+    bool getIsEncrypted() const;
+    void setIsEncrypted(const bool &value);
+    CompressionLevel getCompressionLevel() const;
+    void setCompressionLevel(CompressionLevel level);
+    bool getHasDataDescriptor() const;
+    void setHasDataDescriptor(bool value);
+    std::string getComment() const;
+    void setComment(const std::string &comment);
     std::string getFullName();
     void setFullName(const std::string &entryName);
     CompressionMethod getCompressionMethod() const;
-    IStream *open();
-    long getOffsetOfCompressedData();
+    void setCompressionMethod(CompressionMethod value);
+    double getLastModifier() const;
+    void setLastModifier(double value);
 
 public:
+    long getOffsetOfCompressedData();
     bool writeLocalFileHeader();
     void writeCrcAndSizesInLocalHeader();
     void writeDataDescriptor();
@@ -60,6 +72,7 @@ public:
     void writeCentralDirectoryFileHeader();
     void loadLocalHeaderExtraFieldAndCompressedBytesIfNeeded();
     void writeLocalFileHeaderAndDataIfNeeded();
+    uint getCryptCRC() const;
     ZipArchive *getArchive();
 
 private:
@@ -70,6 +83,7 @@ private:
     IStream *getDataCompressor(IStream *stream, bool leaveOpen);
     IStream *getUncompressedData();
     void closeStream();
+    void Delete();
 
 
 public:
@@ -79,11 +93,43 @@ public:
     static napi_value JSConstructor(napi_env env, napi_callback_info info);
     static void JSDispose(napi_env env, void *data, void *hint);
     static ZipArchiveEntry *getEntry(napi_env env, napi_value value);
-    static napi_value JSOpen(napi_env env, napi_callback_info info);
     napi_value getJSEntry(napi_env env);
     void releaseJSEntry(napi_env env);
     napi_value open(napi_env env);
     napi_ref jsEntry = nullptr;
+    void Delete(napi_env env);
+    
+    
+//     void setIsEncrypted(const bool &value);
+//     CompressionLevel getCompressionLevel() const;
+//     void setCompressionLevel(CompressionLevel level);
+//     bool getHasDataDescriptor() const;
+//     void setHasDataDescriptor(bool value);
+//     std::string getComment() const;
+//     void setComment(const std::string &comment);
+//     std::string getFullName();
+//     void setFullName(const std::string &entryName);
+//     CompressionMethod getCompressionMethod() const;
+//     void setCompressionMethod(CompressionMethod value);
+//     double getLastModifier() const ;
+//     void setLastModifier(double value);
+    static napi_value JSOpen(napi_env env, napi_callback_info info);
+    static napi_value JSSetIsEncrypted(napi_env env, napi_callback_info info);
+    static napi_value JSGetIsEncrypted(napi_env env, napi_callback_info info);
+    static napi_value JSGetCompressionLevel(napi_env env, napi_callback_info info);
+    static napi_value JSSetCompressionLevel(napi_env env, napi_callback_info info);
+    static napi_value JSSetFileComment(napi_env env, napi_callback_info info);
+    static napi_value JSGetFileComment(napi_env env, napi_callback_info info);
+    static napi_value JSGetFullName(napi_env env, napi_callback_info info);
+    static napi_value JSSetFullName(napi_env env, napi_callback_info info);
+    static napi_value JSGetCompressionMethod(napi_env env, napi_callback_info info);
+    static napi_value JSSetCompressionMethod(napi_env env, napi_callback_info info);
+    static napi_value JSSetLastModifier(napi_env env, napi_callback_info info);
+    static napi_value JSGetLastModifier(napi_env env, napi_callback_info info);
+    static napi_value JSGetIsOpened(napi_env env, napi_callback_info info);
+    static napi_value JSGetCRC(napi_env env, napi_callback_info info);
+    static napi_value JSDelete(napi_env env, napi_callback_info info);
+    static napi_value JSGetIsDeleted(napi_env env, napi_callback_info info);
 
 private:
     IStream *openingStream = nullptr;
@@ -98,8 +144,7 @@ private:
     ushort versionToExtract;
     ushort flags;
     ushort compressionMethod;
-    ushort fileTime;
-    ushort fileDate;
+    uint lastModifier;
     uint crc;
     uint compressedSize;
     uint uncompressedSize;
@@ -114,8 +159,7 @@ private:
 
     char *fileName = nullptr;
     char *fileComment = nullptr;
-    char *extraField = nullptr;
-    std::vector<ZipGenericExtraField> fields;
+    std::vector<ZipGenericExtraField *> fields;
 
     std::string m_stored_fullname = "";
 
@@ -125,6 +169,10 @@ private:
     IStream *m_outstandingWriteStream = nullptr;
     MemoryStream *compressedBytes = nullptr;
     MemoryStream *uncompressedData = nullptr;
+
+    byte *cdExtraFields = nullptr;
+    byte *lfExtraFields = nullptr;
+    ushort lfExtraFieldsLength = 0;
 };
 
 #endif // JEMOC_STREAM_TEST_ZIPARCHIVEENTRY_H

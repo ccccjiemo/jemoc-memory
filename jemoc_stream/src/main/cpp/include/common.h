@@ -10,6 +10,9 @@
 #include <napi/native_api.h>
 #include <string>
 #include <ios>
+#include <sys/types.h>
+#include <chrono>
+#include <ctime>
 
 typedef unsigned char byte;
 class IStream;
@@ -18,7 +21,7 @@ class IStream;
 
 #define NAPI_CALL_BASE(env, func, line)                                                                                \
     if (napi_ok != func) {                                                                                             \
-        napi_throw_error(env, "NAPI_CALL_ERROR", #func);                                            \
+        napi_throw_error(env, "NAPI_CALL_ERROR", #func);                                                               \
     }
 
 // #define NAPI_CALL(env, call)                                                                                           \
@@ -142,4 +145,45 @@ static const std::string getString(napi_env env, napi_value value) {
 }
 
 
+static double dostime_to_unix_timestamp(uint32_t dostime) {
+    uint16_t dos_date = static_cast<uint16_t>(dostime >> 16);
+    uint16_t dos_time = static_cast<uint16_t>(dostime & 0xFFFF);
+
+    struct tm t = { 0 }; // 初始化为0
+    t.tm_sec = (dos_time & 0x1F) * 2;            // 5 bits for seconds (0-29, representing 0-58 seconds)
+    t.tm_min = (dos_time >> 5) & 0x3F;           // 6 bits for minutes (0-59)
+    t.tm_hour = (dos_time >> 11) & 0x1F;         // 5 bits for hours (0-23)
+    t.tm_mday = dos_date & 0x1F;                 // 5 bits for day of month (1-31)
+    t.tm_mon = ((dos_date >> 5) & 0x0F) - 1;     // 4 bits for month (1-12, 0-11 for tm_mon)
+    t.tm_year = ((dos_date >> 9) & 0x7F) + 80;   // 7 bits for year (from 1980, tm_year is years since 1900)
+    t.tm_isdst = -1;                             // Not considering daylight saving time
+
+    return static_cast<double>(mktime(&t)) * 1000.0; // 转换为毫秒
+}
+
+static uint32_t unix_timestamp_to_dostime(double unix_timestamp) {
+    time_t seconds = static_cast<time_t>(unix_timestamp / 1000.0);
+    struct tm* t = localtime(&seconds);
+
+    uint16_t dos_date = (t->tm_mday & 0x1F) | ((t->tm_mon + 1) << 5 & 0x1E0) | ((t->tm_year - 80) << 9 & 0xFE00);
+    uint16_t dos_time = (t->tm_sec / 2 & 0x1F) | (t->tm_min << 5 & 0x7E0) | (t->tm_hour << 11 & 0xF800);
+
+    return (dos_date << 16) | dos_time;
+}
+
+static uint32_t get_current_dostime() {
+    time_t now = time(nullptr);
+    struct tm* t = localtime(&now);
+
+    uint16_t dos_date = (t->tm_mday & 0x1F) | ((t->tm_mon + 1) << 5 & 0x1E0) | ((t->tm_year - 80) << 9 & 0xFE00);
+    uint16_t dos_time = (t->tm_sec / 2 & 0x1F) | (t->tm_min << 5 & 0x7E0) | (t->tm_hour << 11 & 0xF800);
+
+    return (dos_date << 16) | dos_time;
+}
+
+static double get_current_unix_timestamp() {
+    using namespace std::chrono;
+    milliseconds ms = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
+    return static_cast<double>(ms.count());
+}
 #endif // JEMOC_STREAM_TEST_UTILS_H

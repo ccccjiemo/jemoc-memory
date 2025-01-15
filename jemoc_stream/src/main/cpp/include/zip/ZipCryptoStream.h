@@ -13,12 +13,16 @@
 #include "common.h"
 #define ZipCryptoStream_DefaultBufferSize 4096
 
+class ZipArchiveEntry;
+
 enum CryptoMode { CryptoMode_Decode, CryptoMode_Encode };
 
 class ZipCryptoStream : public IStream {
 public:
     ZipCryptoStream(IStream *stream, CryptoMode mode, const std::string &password, bool leaveOpen,
                     unsigned long crc = 0, size_t bufferSize = ZipCryptoStream_DefaultBufferSize);
+    ZipCryptoStream(IStream *stream, CryptoMode mode, ZipArchiveEntry *entry, bool leaveOpen,
+                    size_t bufferSize = ZipCryptoStream_DefaultBufferSize);
     ~ZipCryptoStream();
 
     long read(void *buffer, long offset, size_t count) override;
@@ -27,7 +31,6 @@ public:
     long getPosition() const override;
     long getLength() const override;
 
-    void setCRC(unsigned long crc);
 
     static std::string ClassName;
     static napi_ref cons;
@@ -46,16 +49,19 @@ private:
 private:
     IStream *m_stream = nullptr;
     CryptoMode m_mode;
-    const std::string m_password;
+    std::string m_password;
     bool m_leaveOpen;
     unsigned long m_crc;
-    bool m_hasCrc = false;
     unsigned long pkeys[3];
     size_t m_total_read = 0;
     uint8_t *m_buffer = nullptr;
     size_t m_buffer_Size;
-    IStream *m_cache = nullptr;
-    bool m_write_finished = false;
+
+    ZipArchiveEntry *m_entry = nullptr;
+    bool m_everWrite = false;
+    unsigned char verify1 = 0;
+    unsigned char verify2 = 0;
+    bool m_everRead = false;
 };
 
 #endif // JEMOC_STREAM_TEST_ZIPCRYPTOSTREAM_H

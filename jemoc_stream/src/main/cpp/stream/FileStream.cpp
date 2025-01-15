@@ -19,9 +19,9 @@ FileStream::FileStream(const std::string &path, FILE_MODE mode, long bufferSize)
     m_canGetPosition = true;
     m_canSeek = true;
     m_canRead = true;
-    char open_mode[3] = "r";
+    char open_mode[3] = "rb";
     if (mode & FILE_MODE_WRITE) {
-        open_mode[1] = '+';
+        open_mode[2] = '+';
         m_canWrite = true;
     }
     if ((mode & FILE_MODE_TRUNC) || ((mode & FILE_MODE_CREATE) && (access(path.c_str(), F_OK) != 0))) {

@@ -74,8 +74,9 @@ void DeflateStream::close() {
     }
     if (!m_leaveOpen && m_stream != nullptr) {
         m_stream->close();
-        m_stream = nullptr;
+        delete m_stream;
     }
+    m_stream = nullptr;
 }
 
 void DeflateStream::flush() {

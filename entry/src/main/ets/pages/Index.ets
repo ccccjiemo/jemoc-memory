@@ -52,17 +52,24 @@ struct Index {
           //   archive.close();
           // });
 
-          getContext(this).resourceManager.getRawFileContent('test (2).zip', (err, data) => {
+          getContext(this).resourceManager.getRawFileContent('test(crypto).zip', (err, data) => {
             let ms = new MemoryStream();
             ms.write(data);
-            let archive = new ZipArchive(ms, { mode: 1, leaveOpen: true });
+            let archive = new ZipArchive(ms, { mode: 1, leaveOpen: true, password: '12345678' });
             let entry = archive.entries[0];
-            let stream: IStream = entry.open();
             let buffer = util.TextEncoder.create('utf-8').encodeInto("update test;test chinese 中文测试; ");
+            entry.delete();
+            entry = archive.createEntry("test++.txt");
+            entry.isEncrypted = true;
+            let stream = entry.open();
             stream.write(buffer);
             stream.close();
             archive.close();
-
+            let fs = new FileStream(getContext(this).cacheDir + '/test2.zip', 0x9);
+            fs.length = 0;
+            ms.seek(0, 0);
+            ms.copyTo(fs);
+            fs.close();
             console.log('finish');
           })
         })

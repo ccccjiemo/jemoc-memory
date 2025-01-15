@@ -115,6 +115,7 @@ napi_value MemoryStream::JSConstructor(napi_env env, napi_callback_info info) {
 
 void MemoryStream::JSDisposed(napi_env env, void *data, void *hint) {
     MemoryStream *stream = static_cast<MemoryStream *>(data);
+    stream->close();
     delete stream;
 }
 

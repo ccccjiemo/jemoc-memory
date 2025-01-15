@@ -35,6 +35,7 @@ void SubReadStream::close() {
     IStream::close();
     if (!m_leaveOpen && m_stream != nullptr) {
         m_stream->close();
+        delete m_stream;
         m_stream = nullptr;
     }
 }

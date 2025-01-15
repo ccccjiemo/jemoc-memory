@@ -38,8 +38,7 @@ struct ZipCentralDirectoryRecord {
     ushort versionToExtract;
     ushort flags;
     ushort compression;
-    ushort fileTime;
-    ushort fileDate;
+    uint lastModifier;
     uint crc;
     uint compressedSize;
     uint uncompressedSize;
@@ -56,8 +55,9 @@ struct ZipCentralDirectoryRecord {
 struct ZipGenericExtraField {
     ushort tag;
     ushort size;
-    uint8_t* data = nullptr;
-    static std::vector<ZipGenericExtraField> tryRead(IStream* stream, size_t size);
+    uint8_t *data = nullptr;
+    ~ZipGenericExtraField();
+    static std::vector<ZipGenericExtraField *> tryRead(void *buffer, size_t size);
 } __attribute__((packed));
 
 struct ZipDataDescriptor {
@@ -65,7 +65,7 @@ struct ZipDataDescriptor {
     uint crc;
     uint compressedSize;
     uint uncompressedSize;
-    static bool tryRead(IStream * stream, ZipDataDescriptor* descriptor);
+    static bool tryRead(IStream *stream, ZipDataDescriptor *descriptor);
 };
 
 struct ZipLocalFileHeader {
@@ -79,8 +79,8 @@ struct ZipLocalFileHeader {
     uint uncompressedSize;
     ushort fileNameLength;
     ushort extraFieldLength;
-    static bool trySkip(IStream* stream);
-}__attribute__((packed));
+    static bool trySkip(IStream *stream);
+} __attribute__((packed));
 
 namespace ZipCentralDirectory {}
 #endif // JEMOC_STREAM_TEST_ZIPENDOFCENTRALDIRECTORYRECORD_H

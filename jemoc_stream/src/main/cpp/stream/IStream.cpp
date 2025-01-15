@@ -48,9 +48,9 @@ void IStream::close() {
 }
 
 
-DEFINE_ISTREAM_GET_BOOL_FUNCTION(JSGetCanRead, getCanRead)
-DEFINE_ISTREAM_GET_BOOL_FUNCTION(JSGetCanWrite, getCanWrite)
-DEFINE_ISTREAM_GET_BOOL_FUNCTION(JSGetCanSeek, getCanSeek)
+DEFINE_ISTREAM_GET_STATE(JSGetCanRead, getCanRead)
+DEFINE_ISTREAM_GET_STATE(JSGetCanWrite, getCanWrite)
+DEFINE_ISTREAM_GET_STATE(JSGetCanSeek, getCanSeek)
 DEFINE_ISTREAM_GET_LONG_FUNCTION(JSGetPosition, getPosition)
 DEFINE_ISTREAM_GET_LONG_FUNCTION(JSGetLength, getLength)
 
@@ -85,18 +85,19 @@ napi_value IStream::JSCopyTo(napi_env env, napi_callback_info info) {
 
 napi_value IStream::JSSeek(napi_env env, napi_callback_info info) {
     GET_JS_INFO(2)
-    if (!stream->getCanSeek()) {
-        napi_throw_error(env, "IStream::seek", "stream not seekable");
-    }
-    long pos = getLong(env, argv[0]);
-    int origin = getInt(env, argv[1]);
-    long seekResult = 0;
     try {
+        if (!stream->getCanSeek()) {
+            napi_throw_error(env, "IStream::seek", "stream not seekable");
+        }
+        long pos = getLong(env, argv[0]);
+        int origin = getInt(env, argv[1]);
+        long seekResult = 0;
         seekResult = stream->seek(pos, SeekOrigin(origin));
+        RETURN_NAPI_VALUE(napi_create_int64, seekResult)
+
     } catch (const std::ios_base::failure &e) {
-        napi_throw_error(env, "IStream::seek", e.what());
+        napi_throw_error(env, tagName, e.what());
     }
-    RETURN_NAPI_VALUE(napi_create_int64, seekResult)
 }
 
 napi_value IStream::JSRead(napi_env env, napi_callback_info info) {
@@ -176,6 +177,8 @@ napi_value IStream::JSClose(napi_env env, napi_callback_info info) {
         napi_throw_error(env, tagName, "stream is null");
     }
     stream->close();
+    void *result = nullptr;
+    napi_unwrap(env, _this, &result);
     return nullptr;
 }
 
@@ -398,5 +401,18 @@ napi_value IStream::JSCreateInterface(napi_env env, IStream *stream) {
                            delete stream;
                        },
                        nullptr, nullptr))
+    return result;
+}
+
+napi_value IStream::JSGetIsClosed(napi_env env, napi_callback_info info) {
+    GET_JS_INFO_WITHOUT_CHECK(0)
+    bool value = false;
+    try {
+        value = stream == nullptr || stream->isClose();
+    } catch (const std::exception &e) {
+        value = true;
+    }
+    napi_value result = nullptr;
+    NAPI_CALL(env, napi_get_boolean(env, value, &result))
     return result;
 }

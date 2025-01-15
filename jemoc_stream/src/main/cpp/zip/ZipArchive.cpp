@@ -84,7 +84,7 @@ void ZipArchive::close(napi_env env) {
     close();
     for (auto entry = m_entries.begin(); entry != m_entries.end(); entry++) {
         (*entry)->releaseJSEntry(env);
-        delete (*entry);
+//         delete (*entry);
     }
     m_entries.clear();
     m_entriesDictionary.clear();
@@ -325,6 +325,7 @@ void ZipArchive::Export(napi_env env, napi_value exports) {
         DEFINE_NAPI_FUNCTION("mode", nullptr, JSGetMode, nullptr, nullptr),
         DEFINE_NAPI_FUNCTION("createEntry", JSCreateEntry, nullptr, nullptr, nullptr),
         DEFINE_NAPI_FUNCTION("close", JSClose, nullptr, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("isClosed", nullptr, JSGetIsClosed, nullptr, nullptr),
     };
     napi_value napi_cons = nullptr;
     NAPI_CALL(env, napi_define_class(env, ClassName.c_str(), NAPI_AUTO_LENGTH, JSConstructor, nullptr,
@@ -437,6 +438,20 @@ void ZipArchive::JSDispose(napi_env env, void *data, void *hint) {
     ZipArchive *archive = static_cast<ZipArchive *>(data);
     archive->close(env);
     delete archive;
+}
+
+
+void ZipArchive::removeEntry(ZipArchiveEntry *entry) {
+    m_entries.erase(std::remove(m_entries.begin(), m_entries.end(), entry), m_entries.end());
+    m_entriesDictionary.erase(entry->getFullName());
+}
+
+napi_value ZipArchive::JSGetIsClosed(napi_env env, napi_callback_info info) {
+    GET_ZIPARCHIVE_INFO(0)
+    bool value = archive == nullptr || archive->isClosed();
+    napi_value result = nullptr;
+    NAPI_CALL(env, napi_get_boolean(env, value, &result))
+    return result;
 }
 
 
