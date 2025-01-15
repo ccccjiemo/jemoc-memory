@@ -134,9 +134,10 @@ long DeflateStream::write(void *buffer, long offset, size_t count) {
 
 void DeflateStream::writeDeflaterOutput() {
     while (!deflater->needInput()) {
-        long compressedBytes = deflater->getDeflateOutput(m_buffer, m_bufferSize);
+        byte* _buffer = static_cast<byte*>(m_buffer);
+        long compressedBytes = deflater->getDeflateOutput(_buffer, m_bufferSize);
         if (compressedBytes > 0) {
-            m_stream->write(m_buffer, 0, compressedBytes);
+            m_stream->write(_buffer, 0, compressedBytes);
         }
     }
 }

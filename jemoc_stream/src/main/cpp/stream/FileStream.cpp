@@ -126,7 +126,7 @@ napi_value FileStream::JSConstructor(napi_env env, napi_callback_info info) {
     int mode = getInt(env, argv[1]);
     FileStream *stream = nullptr;
     try {
-        stream = new FileStream(path, FILE_MODE(mode), 4096);
+        stream = new FileStream(path, FILE_MODE(mode), 8192);
     } catch (const std::ios_base::failure &e) {
         napi_throw_error(env, "JSFileStream:", e.what());
         return nullptr;

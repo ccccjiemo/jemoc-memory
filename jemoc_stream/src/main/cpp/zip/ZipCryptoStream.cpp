@@ -214,7 +214,7 @@ napi_value ZipCryptoStream::JSConstructor(napi_env env, napi_callback_info info)
     int mode = getInt(env, argv[1]);
     std::string passwd = getString(env, argv[2]);
     unsigned char crc = getLong(env, argv[3]);
-    long bufferSize = 4096;
+    long bufferSize = 8192;
     bool leaveOpen = false;
     napi_value value = nullptr;
     napi_valuetype type;

@@ -13,7 +13,7 @@
 #include "common.h"
 #include <napi/native_api.h>
 
-#define DEFAULT_BUFFER_SIZE 4096
+#define DEFAULT_BUFFER_SIZE 8192
 
 
 enum DeflateMode { DeflateMode_Compress, DeflateMode_Decompress };
@@ -21,7 +21,7 @@ enum DeflateMode { DeflateMode_Compress, DeflateMode_Decompress };
 class DeflateStream : public IStream {
 public:
     DeflateStream(IStream *stream, DeflateMode mode, int windowBits, int compressionLevel, bool leaveOpen,
-                  size_t bufferSize = 8196, long uncompressSize = -1);
+                  size_t bufferSize = 8192, long uncompressSize = -1);
     ~DeflateStream();
 
     void close() override;

@@ -269,7 +269,7 @@ IStream *ZipArchiveEntry::getUncompressedData() {
         if (m_originallyInArchive) {
             try {
                 IStream *stream = openInReadMode();
-                stream->copyTo(uncompressedData, 4096);
+                stream->copyTo(uncompressedData, 8192);
                 stream->close();
             } catch (const std::exception &e) {
                 uncompressedData->close();
@@ -288,10 +288,10 @@ IStream *ZipArchiveEntry::getDataDecompressor(IStream *stream) {
     IStream *decompressor = stream;
     if (compressionMethod == CompressionMethod::Deflate || compressionMethod == CompressionMethod::Deflate64) {
         decompressor =
-            new DeflateStream(stream, DeflateMode_Decompress, -15, m_compression_level, false, 4096, uncompressedSize);
+            new DeflateStream(stream, DeflateMode_Decompress, -15, m_compression_level, false, 8192, uncompressedSize);
     }
     if (getIsEncrypted()) {
-        decompressor = new ZipCryptoStream(decompressor, CryptoMode_Decode, m_archive->getPassword(), false, crc, 4096);
+        decompressor = new ZipCryptoStream(decompressor, CryptoMode_Decode, m_archive->getPassword(), false, crc, 8192);
     }
     return decompressor;
 }
@@ -406,7 +406,7 @@ void ZipArchiveEntry::writeLocalFileHeaderAndDataIfNeeded() {
         IStream *entryWriter =
             new DirectToArchiveWriterStream(getDataCompressor(m_archive->getArchiveStream(), true), this);
         uncompressedData->seek(0, SeekOrigin::Begin);
-        uncompressedData->copyTo(entryWriter, 4096);
+        uncompressedData->copyTo(entryWriter, 8192);
         uncompressedData->close();
         uncompressedData = nullptr;
         entryWriter->close();
@@ -451,9 +451,9 @@ void ZipArchiveEntry::loadLocalHeaderExtraFieldAndCompressedBytesIfNeeded() {
         compressedBytes = new MemoryStream(compressedSize);
         SubReadStream *subRead =
             new SubReadStream(m_archive->getArchiveStream(), getOffsetOfCompressedData(), compressedSize, true);
-        char *buffer = new char[4096];
+        char *buffer = new char[8192];
         long readBytes = 0;
-        while ((readBytes = subRead->read(buffer, 0, 4096)) != 0) {
+        while ((readBytes = subRead->read(buffer, 0, 8192)) != 0) {
             compressedBytes->write(buffer, 0, readBytes);
         }
         delete[] buffer;

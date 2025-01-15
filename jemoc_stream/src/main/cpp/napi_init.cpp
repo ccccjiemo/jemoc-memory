@@ -15,6 +15,8 @@ static napi_value Init(napi_env env, napi_value exports) {
     ZipCryptoStream::Export(env, exports);
     ZipArchive::Export(env, exports);
     ZipArchiveEntry::Export(env, exports);
+    Inflater::Export(env, exports);
+    Deflater::Export(env, exports);
     return exports;
 }
 EXTERN_C_END

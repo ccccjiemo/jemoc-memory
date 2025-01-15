@@ -1,11 +1,3 @@
-export {
-  IStream,
-  MemoryStream,
-  FileStream,
-  ZipCryptoStream,
-  DeflateStream,
-  ZipArchive,
-  ZipArchiveEntry
-} from 'libjemoc_stream.so'
+export * as base from './src/main/ets/base/Index'
 
-export { using, usingAsync } from './src/main/ets/using'
+export * as compression from './src/main/ets/compression/Index'

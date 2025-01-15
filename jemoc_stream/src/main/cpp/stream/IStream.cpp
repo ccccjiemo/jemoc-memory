@@ -174,7 +174,7 @@ napi_value IStream::JSClose(napi_env env, napi_callback_info info) {
     GET_JS_INFO_WITHOUT_STREAM(0)
     IStream *stream = getStream(env, _this);
     if (stream == nullptr) {
-        napi_throw_error(env, tagName, "stream is null");
+        return nullptr;
     }
     stream->close();
     void *result = nullptr;
@@ -396,9 +396,12 @@ napi_value IStream::JSCreateInterface(napi_env env, IStream *stream) {
     NAPI_CALL(env, napi_wrap(
                        env, result, stream,
                        [](napi_env env, void *data, void *hint) {
-                           IStream *stream = static_cast<IStream *>(data);
-                           stream->close();
-                           delete stream;
+                           try {
+                               IStream *stream = static_cast<IStream *>(data);
+                               stream->close();
+                               delete stream;
+                           } catch (const std::exception &e) {
+                           }
                        },
                        nullptr, nullptr))
     return result;

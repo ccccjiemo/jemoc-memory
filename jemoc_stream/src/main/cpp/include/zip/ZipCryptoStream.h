@@ -11,7 +11,7 @@
 #include "zlib-ng.h"
 #include "crypt.h"
 #include "common.h"
-#define ZipCryptoStream_DefaultBufferSize 4096
+#define ZipCryptoStream_DefaultBufferSize 8192  
 
 class ZipArchiveEntry;
 

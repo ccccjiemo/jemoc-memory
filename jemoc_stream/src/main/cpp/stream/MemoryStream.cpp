@@ -70,7 +70,7 @@ void MemoryStream::ensureCapacity(long capacity) {
 
 void MemoryStream::setCapacity(long capacity) {
     m_capacity = capacity;
-    m_cache.reserve(m_capacity);
+    m_cache.resize(m_capacity);
 }
 long MemoryStream::getCapacity() const { return m_capacity; }
 
@@ -125,6 +125,7 @@ napi_value MemoryStream::JSToArrayBuffer(napi_env env, napi_callback_info info) 
     napi_value buffer = nullptr;
     long length = stream->getLength();
     napi_create_arraybuffer(env, length, &data, &buffer);
+    uint8_t* _buffer = static_cast<uint8_t*>(data) ;
     memcpy(data, static_cast<MemoryStream *>(stream)->m_cache.data(), length);
     return buffer;
 }

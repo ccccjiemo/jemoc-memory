@@ -1,0 +1,1 @@
+export { MemoryStream } from 'libjemoc_stream.so'

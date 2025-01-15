@@ -5,6 +5,7 @@
 // please include "napi/native_api.h".
 
 #include "deflate/Inflater.h"
+#include "common.h"
 #include <cstddef>
 #include <ios>
 #include <string>
@@ -120,4 +121,107 @@ bool Inflater::resetStreamForLeftoverInput() {
     zStream->avail_in = len;
     m_finished = false;
     return false;
+}
+
+napi_value Inflater::JSConstructor(napi_env env, napi_callback_info info) {
+    GET_INFLATER_INFO(2)
+    int windowBits = -15;
+    long uncompressedSize = -1;
+    napi_valuetype type;
+    NAPI_CALL(env, napi_typeof(env, argv[0], &type))
+    if (type == napi_number) {
+        NAPI_CALL(env, napi_get_value_int32(env, argv[0], &windowBits))
+    }
+    NAPI_CALL(env, napi_typeof(env, argv[1], &type))
+    if (type == napi_number) {
+        NAPI_CALL(env, napi_get_value_int64(env, argv[1], &uncompressedSize))
+    }
+    try {
+        Inflater *inflater = new Inflater(windowBits, uncompressedSize);
+        NAPI_CALL(env, napi_wrap(env, _this, inflater, JSDispose, nullptr, nullptr))
+        return _this;
+    } catch (const std::exception &e) {
+        return nullptr;
+    }
+}
+
+void Inflater::JSDispose(napi_env env, void *data, void *hint) {
+    Inflater *inflater = static_cast<Inflater *>(data);
+    delete inflater;
+    inflater = nullptr;
+}
+
+napi_value Inflater::JSGetIsFinished(napi_env env, napi_callback_info info) {
+    GET_INFLATER_INFO_WITH_INFLATER(0)
+    napi_value result = nullptr;
+    napi_get_boolean(env, inflater->isFinished(), &result);
+    return result;
+}
+napi_value Inflater::JSInflate(napi_env env, napi_callback_info info) {
+    GET_INFLATER_INFO_WITH_INFLATER(3)
+    void *buffer = nullptr;
+    size_t length = 0;
+    getBuffer(env, argv[0], &buffer, &length);
+    long offset = getOffset(env, argv[1], length);
+    size_t count = getCount(env, argv[2], length, offset);
+    long readBytes = inflater->inflate(offset_pointer(buffer, offset), count);
+    napi_value result = nullptr;
+    NAPI_CALL(env, napi_create_int64(env, readBytes, &result))
+    return result;
+}
+napi_value Inflater::JSGetIsGzipStream(napi_env env, napi_callback_info info) {
+    GET_INFLATER_INFO_WITH_INFLATER(0)
+    napi_value result = nullptr;
+    napi_get_boolean(env, inflater->isGzipStream(), &result);
+    return result;
+}
+
+napi_value Inflater::JSSetInput(napi_env env, napi_callback_info info) {
+    GET_INFLATER_INFO_WITH_INFLATER(3)
+    void *buffer = nullptr;
+    size_t length = 0;
+    getBuffer(env, argv[0], &buffer, &length);
+    long offset = getOffset(env, argv[1], length);
+    size_t count = getCount(env, argv[2], length, offset);
+    inflater->setInput(offset_pointer(buffer, offset), count);
+    return nullptr;
+}
+napi_value Inflater::JSNeedInput(napi_env env, napi_callback_info info) {
+    GET_INFLATER_INFO_WITH_INFLATER(0)
+    napi_value result = nullptr;
+    napi_get_boolean(env, inflater->needInput(), &result);
+    return result;
+}
+
+napi_value Inflater::JSDispose(napi_env env, napi_callback_info info) {
+    GET_INFLATER_INFO(0)
+    void *result = nullptr;
+    NAPI_CALL(env, napi_remove_wrap(env, _this, &result))
+    return nullptr;
+}
+
+napi_value Inflater::JSIsDisposed(napi_env env, napi_callback_info info) {
+    GET_INFLATER_INFO(0)
+    void *inflater = nullptr;
+    NAPI_CALL(env, napi_unwrap(env, _this, &inflater))
+    bool value = inflater == nullptr;
+    napi_value result = nullptr;
+    napi_get_boolean(env, value, &result);
+    return result;
+}
+
+void Inflater::Export(napi_env env, napi_value exports) {
+    napi_property_descriptor desc[] = {
+        DEFINE_NAPI_FUNCTION("isFinished", nullptr, JSGetIsFinished, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("inflate", JSInflate, nullptr, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("isGzipInput", JSGetIsGzipStream, nullptr, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("setInput", JSSetInput, nullptr, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("dispose", JSDispose, nullptr, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("isDisposed", nullptr, JSIsDisposed, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("needInput", nullptr, JSNeedInput, nullptr, nullptr),
+    };
+    napi_value cons = nullptr;
+    napi_define_class(env, "Inflater", NAPI_AUTO_LENGTH, JSConstructor, nullptr, sizeof(desc) / sizeof(desc[0]), desc,
+                      &cons);
+    napi_set_named_property(env, exports, "Inflater", cons);
 }

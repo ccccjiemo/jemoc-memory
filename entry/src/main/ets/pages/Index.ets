@@ -1,4 +1,4 @@
-import { DeflateStream, FileStream, IStream, MemoryStream, using, ZipArchive, ZipCryptoStream } from '@jemoc/stream';
+import { base, compression } from '@jemoc/stream';
 import { fileUri } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
 
@@ -17,45 +17,32 @@ struct Index {
           center: { anchor: '__container__', align: VerticalAlign.Center },
           middle: { anchor: '__container__', align: HorizontalAlign.Center }
         })
+      Button('test deflate')
+        .onClick(() => {
+          getContext(this).resourceManager.getRawFileContent('lorem_1mb.txt', (err, data) => {
+            if (err) {
+              return;
+            }
+            let start = Date.now();
+            let result = compression.Deflator.deflate(data);
+            let end = Date.now();
+            console.log(`-----------deflate---${end - start}ms`);
+            start = end;
+            result = compression.Inflator.inflate(result);
+            end = Date.now();
+            console.log(`-----------inflate---${end - start}ms`);
+            let fs = new base.FileStream(getContext(this).cacheDir + '/deflate_test.txt', 0x9);
+            fs.write(result);
+            fs.close();
+          })
+
+        })
       Button('test')
         .onClick(() => {
-          // getContext(this).resourceManager.getRawFileContent('test.zip', (err, data) => {
-          //   let ms = new MemoryStream(data.length)
-          //   ms.write(data);
-          //   let archive = new ZipArchive(ms, { password: '12345678' });
-          //
-          //   let entries = archive.entries;
-          //   let stream = entries[0].open();
-          //   let dir = getContext(this).cacheDir + '/test.pdf';
-          //
-          //   let fs = new FileStream(dir, 0x19);
-          //   let bytesRead = 0;
-          //   let buffer = new ArrayBuffer(4096);
-          //   let start = Date.now();
-          //   while ((bytesRead = stream.read(buffer)) != 0) {
-          //     fs.write(buffer, 0, bytesRead);
-          //   }
-          //   fs.close();
-          //   stream.close();
-          //   console.log('1');
-          //   console.log(`decompress: ${Date.now() - start}ms`)
-          // });
-
-          // getContext(this).resourceManager.getRawFileContent('0002.jpg', (err, data) => {
-          //   let dir = getContext(this).cacheDir + '/test.zip';
-          //   let fs = new FileStream(dir, 0x09);
-          //   let archive = new ZipArchive(fs, { mode: 2, password: '12345678' });
-          //   let entry = archive.createEntry("0002.jpg");
-          //   let stream = entry.open();
-          //   stream.write(data);
-          //   stream.close();
-          //   archive.close();
-          // });
-
           getContext(this).resourceManager.getRawFileContent('test(crypto).zip', (err, data) => {
-            let ms = new MemoryStream();
+            let ms = new base.MemoryStream();
             ms.write(data);
-            let archive = new ZipArchive(ms, { mode: 1, leaveOpen: true, password: '12345678' });
+            let archive = new compression.ZipArchive(ms, { mode: 1, leaveOpen: true, password: '12345678' });
             let entry = archive.entries[0];
             let buffer = util.TextEncoder.create('utf-8').encodeInto("update test;test chinese 中文测试; ");
             entry.delete();
@@ -65,7 +52,7 @@ struct Index {
             stream.write(buffer);
             stream.close();
             archive.close();
-            let fs = new FileStream(getContext(this).cacheDir + '/test2.zip', 0x9);
+            let fs = new base.FileStream(getContext(this).cacheDir + '/test2.zip', 0x9);
             fs.length = 0;
             ms.seek(0, 0);
             ms.copyTo(fs);

@@ -20,6 +20,7 @@ export interface IStream {
   get position(): number;
 
   get length(): number;
+
   set length(value: number);
 
   copyTo(stream: IStream, bufferSize?: number): void
@@ -71,6 +72,7 @@ export class MemoryStream implements IStream {
   get position(): number;
 
   get length(): number;
+
   set length(value: number);
 
   copyTo(stream: IStream, bufferSize?: number | undefined): void;
@@ -93,7 +95,7 @@ export class MemoryStream implements IStream {
 }
 
 export class FileStream implements IStream {
-  constructor(path: string, mode: number)
+  constructor(path: string, mode?: number)
 
   get canRead(): boolean;
 
@@ -104,6 +106,7 @@ export class FileStream implements IStream {
   get position(): number;
 
   get length(): number;
+
   set length(value: number);
 
   copyTo(stream: IStream, bufferSize?: number | undefined): void;
@@ -141,6 +144,7 @@ export class DeflateStream implements IStream {
   get position(): number;
 
   get length(): number;
+
   set length(value: number);
 
   copyTo(stream: IStream, bufferSize?: number | undefined): void;
@@ -183,6 +187,7 @@ export class ZipCryptoStream implements IStream {
   get position(): number;
 
   get length(): number;
+
   set length(value: number);
 
   copyTo(stream: IStream, bufferSize?: number | undefined): void;
@@ -206,7 +211,6 @@ export class ZipCryptoStream implements IStream {
   close(): void;
 
   closeAsync(): Promise<void>;
-
 }
 
 interface ZipArchiveOption {
@@ -217,40 +221,93 @@ interface ZipArchiveOption {
 
 export class ZipArchiveEntry {
   private constructor()
-  open(): IStream
-  delete(): void
-  get fullName(): string
-  set fullName(value: string)
-  get isEncrypted(): boolean
-  set isEncrypted(value: boolean)
-  get compressionLevel(): number
-  set compressionLevel(value: number)
-  get compressionMethod(): number
-  set compressionMethod(value: number)
-  get fileComment(): string
-  set fileComment(value: string)
-  get lastModifer(): Date
-  set lastModifer(value: Date)
-  get crc32(): number
-  get isOpened(): boolean
-  get isDeleted(): boolean
 
+  open(): IStream
+
+  delete(): void
+
+  get fullName(): string
+
+  set fullName(value: string)
+
+  get isEncrypted(): boolean
+
+  set isEncrypted(value: boolean)
+
+  get compressionLevel(): number
+
+  set compressionLevel(value: number)
+
+  get compressionMethod(): number
+
+  set compressionMethod(value: number)
+
+  get fileComment(): string
+
+  set fileComment(value: string)
+
+  get lastModifier(): Date
+
+  get crc32(): number
+
+  get isOpened(): boolean
+
+  get isDeleted(): boolean
 }
 
 export class ZipArchive {
   constructor(stream: IStream, option?: ZipArchiveOption)
+
   constructor(path: string, option?: ZipArchiveOption)
 
   get entries(): ZipArchiveEntry[]
 
   get comment(): string
+
   set comment(value: string)
 
   get mode(): number
 
   getEntry(entryName: string): ZipArchiveEntry | undefined
-  createEntry(entryName: string): ZipArchiveEntry
+
+  createEntry(entryName: string, compressionLevel?: number): ZipArchiveEntry
 
   close(): void
+}
 
+
+export class Deflater {
+  constructor(windowBits?: number, compressionLevel?: number, strategy?: number)
+
+  setInput(input: BufferLike, offset?: number, count?: number): void
+
+  dispose(): void
+
+  deflate(buffer: BufferLike, offset?: number, count?: number): number
+
+  flush(buffer: BufferLike, offset?: number, count?: number): { result: boolean, readBytes: number }
+
+  finish(buffer: BufferLike, offset?: number, count?: number): { result: boolean, readBytes: number }
+
+  get needInput(): boolean
+
+  get isDisposed(): boolean
+}
+
+export class Inflater {
+  constructor(windowBits?: number, uncompressSize?: number)
+
+  setInput(input: BufferLike, offset?: number, count?: number): void
+
+  dispose(): void
+
+  inflate(buffer: BufferLike, offset?: number, count?: number): number
+
+  get needInput(): boolean
+
+  get isDisposed(): boolean
+
+  get isFinished(): boolean
+
+  get isGzipInput(): boolean
 }
