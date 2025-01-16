@@ -5,7 +5,7 @@ export type BufferLike = ArrayBufferLike | Uint8Array;
 declare namespace base {
 
   /**
-   * Stream基类，所有Stream继承自IStream,不要混用同步和异步方法
+   * Stream基类，所有Stream继承自IStream,不要混用同步和异步方法，异常均会抛出错误
    */
   interface IStream {
     /**
@@ -87,11 +87,14 @@ declare namespace base {
      * 将buffer数据写入流中，并推动指针位置
      * @param buffer 要写入的数据
      * @param offset 数据buffer的地址偏移。offset不可为负数
-     * @param count
+     * @param count 写入大小
      * @returns
      */
     write(buffer: BufferLike, offset?: number, count?: number): number
 
+    /**
+     * write异步方法
+     */
     writeAsync(buffer: BufferLike, offset?: number, count?: number): Promise<number>
 
     /**
@@ -100,7 +103,7 @@ declare namespace base {
     flush(): void
 
     /**
-     * 刷新流
+     * flush异步方法
      */
     flushAsync(): Promise<void>
 

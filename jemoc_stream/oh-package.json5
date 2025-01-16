@@ -1,7 +1,7 @@
 {
   "name": "@jemoc/stream",
   "version": "1.0.0",
-  "description": "参考C# Stream实现,并提供Deflate方法.",
+  "description": "参考.net Stream方法实现,并提供Deflate方法.",
   "keywords": [
     "deflate",
     "inflate",

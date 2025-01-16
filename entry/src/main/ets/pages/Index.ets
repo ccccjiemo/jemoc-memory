@@ -46,7 +46,7 @@ struct Index {
             let entry = archive.entries[0];
             let buffer = util.TextEncoder.create('utf-8').encodeInto("update test;test chinese 中文测试; ");
             entry.delete();
-            entry = archive.createEntry("test++.txt");
+            entry = archive.createEntry("t/test++.txt");
             entry.isEncrypted = true;
             let stream = entry.open();
             stream.write(buffer);

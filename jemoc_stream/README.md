@@ -1,6 +1,6 @@
 ## @jemoc/stream
 
-方法参考C# Stream。zlib-ng提供Inflate、Deflate支持。
+方法参考.net Stream。zlib-ng提供Inflate、Deflate支持。
 
 实现MemoryStream，自动扩容内存流
 
@@ -22,6 +22,11 @@ ohpm install @jemoc/stream
 ```
 
 ---
+
+### IStream
+<details>
+
+<summary>Interface</summary>
 
 ```typescript
  /**
@@ -135,6 +140,8 @@ close(): void
 closeAsync(): Promise<void>
 }
 ```
+</details>
+
 
 ### 如何使用
 
@@ -146,13 +153,27 @@ let fs = new base.FileStream(path, base.FileMode.Read);
 let ms = new MemoryStream();
 let ds = new DeflateStream(fs, DeflateMode.Decompress);
 
-//let buffer: Uint8Array
+/**
+ * 写入数据
+ * buffer: Uint8Array | ArrayBuffer
+ */
 ms.write(buffer)
 //写入10位 从buffer第10位开始
 ms.write(buffer, 10, 10)
 
+//指向流首位
+ms.seek(0, base.SeekOrigin.Begin)
+
+//读取数据上面写入的10位数据
+ms.read(buffer, 0, 10)
+
+        
+//MemoryStream额外有toArrayBuffer方法
+//toArrayBuffer返回丛0到流末端(length)的所有数据        
+buffer = ms.toArrayBuffer()
+
 //使用完必须释放对象
-ms.close();
+ms.close()
 ```
 
 ```typescript
@@ -182,6 +203,52 @@ let inflateTransform = Inflator.createStream();
 //ps: 鸿蒙好像没提供pipeline方法  
 rs.pipe(deflateTransform);
 deflateTransform.pipe(ws);
+
+/**
+ * ZipArchive参考
+ */
+let zip:ZipArchive
+try {
+  let fs = new FileStream(path, FileMode.Write)
+
+  //参考zip使用zipcrypto加密
+  let zip = new ZipArchive(fs, { mode: ZipArchiveMode.Update, leaveOpen: false, password: '12345678' })
+
+  //获取所有entry
+  let entries: ZipArchiveEntry[] = zip.entries
+
+  //获取某个entry
+  let entry: ZipArchiveEntry | undefined = zip.getEntry('123.txt')
+
+  //假设entry存在
+  let stream: base.IStream = entry.open()
+
+  //读取全部解压数据
+  let ms = new MemoryStream()
+  let readBytes = 0
+  let buffer = new ArrayBuffer(4096)
+  while ((readBytes = stream.read(buffer)) != 0) {
+    ms.write(buffer, 0, readBytes)
+  }
+  let result: ArrayBuffer = ms.toArrayBuffer()
+  ms.close() //释放内存
+
+  //覆写内容，update模式下可以截断数据
+   stream.length = 0
+   stream.write(result)
+   
+   stream.close() //关闭流，保存写入的数据
+   
+
+
+} catch (e) {
+  //抛出异常
+} finally {
+  zip?.close()
+}
+
+
+
 ```
 
 
