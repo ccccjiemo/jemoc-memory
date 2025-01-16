@@ -14,7 +14,7 @@
   "homepage": "https://gitee.com/jiemoccc/jemoc-memory.git",
   "repository": "https://gitee.com/jiemoccc/jemoc-memory.git",
   "author": "ccccjiemo",
-  "license": "Apache-2.0",
+  "license": "(MIT AND ZLIB)",
   "dependencies": {
     "libjemoc_stream.so": "file:./src/main/cpp/types/libjemoc_stream"
   }
