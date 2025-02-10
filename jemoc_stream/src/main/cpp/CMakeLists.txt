@@ -16,8 +16,10 @@ include_directories(${NATIVERENDER_ROOT_PATH}
                     ${NATIVERENDER_ROOT_PATH}/include
                     ${NATIVERENDER_ROOT_PATH}/zlib-ng/include)
 
-add_library(zlib-ng SHARED IMPORTED)
-set_target_properties(zlib-ng PROPERTIES IMPORTED_LOCATION ${NATIVERENDER_ROOT_PATH}/zlib-ng/libs/${OHOS_ARCH}/libz-ng.a)
+add_library(zlib-ng STATIC IMPORTED)
+set_target_properties(zlib-ng PROPERTIES 
+    IMPORTED_LOCATION ${NATIVERENDER_ROOT_PATH}/zlib-ng/libs/${OHOS_ARCH}/libz-ng.a
+    INTERFACE_INCLUDE_DIRECTORIES ${NATIVERENDER_ROOT_PATH}/zlib-ng/include)
 
 add_library(jemoc_stream SHARED napi_init.cpp ${STREAM_FILE} ${DEFLATE_FILE} ${ZIP_FILE})
 target_link_libraries(jemoc_stream PUBLIC libace_napi.z.so zlib-ng)

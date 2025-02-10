@@ -130,6 +130,8 @@ public:
     static napi_value JSGetCRC(napi_env env, napi_callback_info info);
     static napi_value JSDelete(napi_env env, napi_callback_info info);
     static napi_value JSGetIsDeleted(napi_env env, napi_callback_info info);
+    static napi_value JSGetUnCompressedSize(napi_env env, napi_callback_info info);
+    static napi_value JSGetCompressedSize(napi_env env, napi_callback_info info);
 
 private:
     IStream *openingStream = nullptr;

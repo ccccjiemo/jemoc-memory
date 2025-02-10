@@ -22,6 +22,8 @@ enum FILE_MODE {
 class FileStream : public IStream {
 public:
     FileStream(const std::string &path, FILE_MODE mode, long bufferSize);
+    FileStream(const int &fd, FILE_MODE mode, long bufferSize);
+    FileStream(const int &fd, long offset, long length);
     ~FileStream();
     long write(void *buffer, long offset, size_t count) override;
     long read(void *buffer, long offset, size_t count) override;
@@ -37,10 +39,11 @@ public:
     static void JSDispose(napi_env env, void *data, void *hint);
 
 private:
-    std::string m_file_path;
     FILE_MODE m_mode;
     long m_bufferSize;
     FILE *file = nullptr;
+    long m_offset = 0;
+    bool m_is_raw_file = false;
 };
 
 

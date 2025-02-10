@@ -20,6 +20,7 @@ class ZipArchive {
 public:
     ZipArchive(IStream *stream, const ZipArchiveMode mode, const std::string &password, bool leaveOpen);
     ZipArchive(const std::string &path, const ZipArchiveMode mode, const std::string &password);
+    ZipArchive(const int &fd, const long &offset, const long &length, const std::string &password);
     ~ZipArchive();
     std::string getComment() const;
     void setComment(const std::string &comment);

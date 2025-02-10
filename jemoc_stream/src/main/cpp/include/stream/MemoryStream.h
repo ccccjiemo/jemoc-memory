@@ -22,7 +22,9 @@ public:
     long getCapacity() const;
     void close() override;
     void setLength(long length) override;
-    const byte *getData() const { return m_cache.data(); }
+//     const byte *getData() const { return m_cache->data(); }
+    const byte *getData() const { return mm_cache; }
+    long align4k(long size) const { return (size + 4096) & ~4096; }
 
 
 public:
@@ -39,8 +41,9 @@ private:
     void ensureCapacity(long capacity);
 
 private:
-    std::vector<byte> m_cache;
-    long m_capacity;
+//     std::vector<byte> *m_cache;
+    long m_capacity = 0;
+    byte *mm_cache = nullptr;
 };
 
 

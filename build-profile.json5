@@ -1,6 +1,20 @@
 {
   "app": {
-    "signingConfigs": [],
+    "signingConfigs": [
+      {
+        "name": "default",
+        "type": "HarmonyOS",
+        "material": {
+          "certpath": "C:\\Users\\ccccj\\.ohos\\config\\default_Jemoc_Stream_Test_K4OwLeCWIx1blzVlNl8bVuHliUREp5AG192z0AADtKA=.cer",
+          "storePassword": "0000001B31B282239F7462AB00F041BF423505E7A6BC0C5A113B33C7BC23105C9FC84F87F1B86D8E7CC3D0",
+          "keyAlias": "debugKey",
+          "keyPassword": "0000001B4185BD929D438D4FC7150EC5A27BEDBFB6DD63BFA6FCCD088D4C62ECF39D57789091A39797145A",
+          "profile": "C:\\Users\\ccccj\\.ohos\\config\\default_Jemoc_Stream_Test_K4OwLeCWIx1blzVlNl8bVuHliUREp5AG192z0AADtKA=.p7b",
+          "signAlg": "SHA256withECDSA",
+          "storeFile": "C:\\Users\\ccccj\\.ohos\\config\\default_Jemoc_Stream_Test_K4OwLeCWIx1blzVlNl8bVuHliUREp5AG192z0AADtKA=.p12"
+        }
+      }
+    ],
     "products": [
       {
         "name": "default",
@@ -13,7 +27,10 @@
             "useNormalizedOHMUrl": true
           },
           "externalNativeOptions": {
-            "abiFilters": ["x86_64", "arm64-v8a"]
+            "abiFilters": [
+              "x86_64",
+              "arm64-v8a"
+            ]
           }
         }
       }

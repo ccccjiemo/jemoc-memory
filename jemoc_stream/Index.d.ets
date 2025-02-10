@@ -1,4 +1,6 @@
 import { stream } from "@kit.ArkTS";
+import { fileIo } from "@kit.CoreFileKit";
+import { resourceManager } from "@kit.LocalizationKit";
 
 export type BufferLike = ArrayBufferLike | Uint8Array;
 
@@ -157,6 +159,13 @@ declare namespace base {
   }
 
   /**
+   * 将base.IStream转换成fs.Stream,方便在rcp中使用（果然没有什么是增加中间层不能解决的）
+   * @param stream
+   * @returns
+   */
+  function createFSStream(stream: IStream): fileIo.Stream;
+
+  /**
    * 文件流，适应IStream方式
    */
   class FileStream implements IStream {
@@ -166,6 +175,10 @@ declare namespace base {
      * @param mode 默认Read模式
      */
     constructor(path: string, mode?: FileMode)
+
+    constructor(fd: number, mode?: FileMode)
+
+    constructor(rawFile: resourceManager.RawFileDescriptor)
 
     /**
      * 当追加模式，这个是可能是false
@@ -284,6 +297,12 @@ declare namespace base {
     close(): void;
 
     closeAsync(): Promise<void>;
+
+    /**
+     * 返回流中的所有数据，不修改指针位置
+     * @returns
+     */
+    toArrayBuffer(): ArrayBuffer;
   }
 }
 
@@ -447,6 +466,7 @@ declare namespace compression {
   interface DeflatorOption {
     windowBits?: number;
     compressionLevel?: number;
+    bufferSize?: number;
   }
 
   /**
@@ -611,6 +631,12 @@ declare namespace compression {
     constructor(path: string, option?: ZipArchiveOption)
 
     /**
+     * 只读方式读取读取rawFile
+     * @param rawFile
+     */
+    constructor(rawFile: resourceManager.RawFileDescriptor, password?: string)
+
+    /**
      * 获取Zip所有entry
      * @returns
      */
@@ -727,5 +753,17 @@ declare namespace compression {
      * @returns
      */
     get isDeleted(): boolean
+
+    /**
+     * ZipArchive打开使用Read模式或者在Update模式下未open，可以获取到值，否则返回0
+     * @returns
+     */
+    get uncompressedSize(): number
+
+    /**
+     * ZipArchive打开使用Read模式或者在Update模式下未open，可以获取到值，否则返回0
+     * @returns
+     */
+    get compressedSize(): number
   }
 }

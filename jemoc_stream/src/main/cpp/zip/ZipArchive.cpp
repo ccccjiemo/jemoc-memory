@@ -78,6 +78,12 @@ ZipArchive::ZipArchive(const std::string &path, const ZipArchiveMode mode, const
     new (this) ZipArchive(stream, mode, password, false);
 }
 
+ZipArchive::ZipArchive(const int &fd, const long &offset, const long &length, const std::string &password)
+    : m_mode(ZipArchiveMode_Read), m_leaveOpen(false), m_passwd(password) {
+    new (this) ZipArchive(new FileStream(fd, offset, length), ZipArchiveMode_Read, password, false);
+}
+
+
 ZipArchive::~ZipArchive() {}
 
 void ZipArchive::close(napi_env env) {
@@ -265,7 +271,10 @@ napi_value ZipArchive::JSConstructor(napi_env env, napi_callback_info info) {
 
     NAPI_CALL(env, napi_typeof(env, argv[1], &type))
 
-    if (type != napi_undefined) {
+    if (type == napi_string) {
+        passwd = getString(env, argv[1]);
+
+    } else if (type == napi_object) {
         napi_value value = nullptr;
 
         // 获取leaveOpen
@@ -298,9 +307,24 @@ napi_value ZipArchive::JSConstructor(napi_env env, napi_callback_info info) {
             zip = new ZipArchive(path, ZipArchiveMode(mode), passwd);
         } else {
             IStream *stream = getStream(env, argv[0]);
-            if (stream == nullptr)
-                napi_throw_error(env, ClassName.c_str(), "invalid argument stream, stream is null");
-            zip = new ZipArchive(stream, ZipArchiveMode(mode), passwd, leaveOpen);
+            if (stream == nullptr) {
+                napi_value js_fd = nullptr;
+                napi_value js_offset = nullptr;
+                napi_value js_length = nullptr;
+                NAPI_CALL(env, napi_get_named_property(env, argv[0], "fd", &js_fd))
+                NAPI_CALL(env, napi_get_named_property(env, argv[0], "offset", &js_offset))
+                NAPI_CALL(env, napi_get_named_property(env, argv[0], "length", &js_length))
+                int fd = 0;
+                long offset = 0;
+                long length = 0;
+                NAPI_CALL(env, napi_get_value_int32(env, js_fd, &fd))
+                NAPI_CALL(env, napi_get_value_int64(env, js_offset, &offset))
+                NAPI_CALL(env, napi_get_value_int64(env, js_length, &length))
+                zip = new ZipArchive(fd, offset, length, passwd);
+            } else {
+                zip = new ZipArchive(stream, ZipArchiveMode(mode), passwd, leaveOpen);
+            }
+//                 napi_throw_error(env, ClassName.c_str(), "invalid argument stream, stream is null");
         }
     } catch (const std::ios::failure &e) {
         napi_throw_error(env, ClassName.c_str(), e.what());

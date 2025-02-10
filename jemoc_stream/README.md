@@ -1,5 +1,6 @@
 ## @jemoc/stream
 
+---
 方法参考.net Stream。zlib-ng提供Inflate、Deflate支持。
 
 实现MemoryStream，自动扩容内存流
@@ -21,164 +22,258 @@ ___
 ohpm install @jemoc/stream
 ```
 
+## 目录
+
+--- 
+
+- [基础流 (命名空间 base)](#基础流-namespace-base)
+    - [IStream 接口](#istream-接口)
+    - [SeekOrigin 枚举](#seekorigin-枚举)
+    - [FileMode 枚举](#filemode-枚举)
+    - [FileStream 类](#filestream-类)
+    - [MemoryStream 类](#memorystream-类)
+    - [createFSStream 函数](#createfsstream-函数)
+- [压缩流 (命名空间 compression)](#压缩流-namespace-compression)
+    - [DeflateStream 类](#deflatestream-类)
+    - [Deflator 类](#deflator-类)
+    - [Inflator 类](#inflator-类)
+    - [ZipArchive 类](#ziparchive-类)
+- [使用示例](#使用示例)
+
 ---
 
-### IStream
-<details>
+## 基础流 (namespace base)
 
-<summary>Interface</summary>
+### IStream 接口
+
+流操作基础接口，所有流类型都实现此接口
+
+**属性：**
+
+- `canRead`: boolean - 是否可读
+- `canWrite`: boolean - 是否可写
+- `canSeek`: boolean - 是否支持随机访问
+- `position`: number - 当前指针位置
+- `length`: number - 流长度（通常用于截断文件）
+
+**方法：**
+
+- `copyTo(stream: IStream, bufferSize?: number): void`
+- `copyToAsync(stream: IStream, bufferSize?: number): Promise<void>`
+- `seek(offset: number, origin: SeekOrigin): void`
+- `read(buffer: BufferLike, offset?: number, count?: number): number`
+- `readAsync(buffer: BufferLike, offset?: number, count?: number): Promise<number>`
+- `write(buffer: BufferLike, offset?: number, count?: number): number`
+- `writeAsync(buffer: BufferLike, offset?: number, count?: number): Promise<number>`
+- `flush(): void`
+- `flushAsync(): Promise<void>`
+- `close(): void`
+- `closeAsync(): Promise<void>`
+
+### SeekOrigin 枚举
 
 ```typescript
- /**
- * Stream基类，所有Stream继承自IStream,不要混用同步和异步方法
- */
-interface IStream {
-/**
- * 流是否可读
- * @returns
- */
-get canRead(): boolean;
-
-/**
- * 流是否可写
- * @returns
- */
-get canWrite(): boolean;
-
-/**
- * 流是否可随机访问
- * @returns
- */
-get canSeek(): boolean;
-
-/**
- * 流指针位置
- * @returns
- */
-get position(): number;
-
-/**
- * 流长度
- * @returns
- */
-get length(): number;
-
-/**
- * 设置流长度，可能会截断流
- * @param value
- */
-set length(value: number);
-
-/**
- * 拷贝从指针位置到流末端的数据到指定流（Stream)中.并推动指针到末端
- * @param stream 拷贝接收对象
- * @param bufferSize 拷贝缓冲大小
- */
-copyTo(stream: IStream, bufferSize?: number): void
-
-/**
- * 拷贝从指针位置到流末端的数据到指定流（Stream)中.并推动指针到末端
- * @param stream 拷贝接收对象
- * @param bufferSize 拷贝缓冲大小
- */
-copyToAsync(stream: IStream, bufferSize?: number): Promise<void>
-
-/**
- * 随机访问，指定指针位置
- * @param offset 相对偏移
- * @param origin 相对位置
- */
-seek(offset: number, origin: SeekOrigin): void
-
-/**
- * 从流中读取数据到指定buffer中，并推动指针位置
- * @param buffer 接受buffer
- * @param offset buffer地址偏移。offset不可为负数
- * @param count 读取大小
- * @returns 实际读取大小
- */
-read(buffer: BufferLike, offset?: number, count?: number): number
-
-/**
- * read的异步方法，从流中读取数据到指定buffer中，并推动指针位置
- * @param buffer 接受buffer
- * @param offset buffer地址偏移。offset不可为负数
- * @param count 读取大小
- * @returns 实际读取大小
- */
-readAsync(buffer: BufferLike, offset?: number, count?: number): Promise<number>
-
-/**
- * 将buffer数据写入流中，并推动指针位置
- * @param buffer 要写入的数据
- * @param offset 数据buffer的地址偏移。offset不可为负数
- * @param count
- * @returns
- */
-write(buffer: BufferLike, offset?: number, count?: number): number
-
-writeAsync(buffer: BufferLike, offset?: number, count?: number): Promise<number>
-
-/**
- * 刷新流
- */
-flush(): void
-
-/**
- * 刷新流
- */
-flushAsync(): Promise<void>
-
-/**
- * 关闭流对象，并释放流
- */
-close(): void
-
-/**
- * 关闭流对象，并释放流
- */
-closeAsync(): Promise<void>
+enum SeekOrigin {
+Begin, // 流开始位置
+Current, // 当前位置
+End // 流末端
 }
 ```
-</details>
 
-
-### 如何使用
+### FileMode 枚举
 
 ```typescript
-import { base } from '@jemoc/stream'
-
-//详情见注释
-let fs = new base.FileStream(path, base.FileMode.Read);
-let ms = new MemoryStream();
-let ds = new DeflateStream(fs, DeflateMode.Decompress);
-
-/**
- * 写入数据
- * buffer: Uint8Array | ArrayBuffer
- */
-ms.write(buffer)
-//写入10位 从buffer第10位开始
-ms.write(buffer, 10, 10)
-
-//指向流首位
-ms.seek(0, base.SeekOrigin.Begin)
-
-//读取数据上面写入的10位数据
-ms.read(buffer, 0, 10)
-
-        
-//MemoryStream额外有toArrayBuffer方法
-//toArrayBuffer返回丛0到流末端(length)的所有数据        
-buffer = ms.toArrayBuffer()
-
-//使用完必须释放对象
-ms.close()
+enum FileMode {
+READ = 0x00, // 只读
+WRITE = 0x01, // 只写
+APPEND = 0x02, // 追加模式
+TRUNC = 0x04, // 截断模式
+CREATE = 0x08 // 文件不存在时创建
+}
 ```
 
-```typescript
-import { compression } from '@jemoc/stream'
+### FileStream 类
 
+文件流实现，继承自 IStream
+
+**构造函数：**
+
+- `new FileStream(path: string, mode? : FileMode)` 通过路径打开文件流
+- `new FileStream(fd: number, mode? : FileMode)` 通过文件标识打开文件流
+- `new FileStream(rawFile: resourceManager.RawFileDescriptor)` 通过rawfile描述符打开文件流，此模式为只读
+
+### MemoryStream 类
+
+内存流实现，继承自 IStream
+
+**特有方法：**
+
+- `toArrayBuffer(): ArrayBuffer`  返回内存流数据（不修改指针位置）
+
+### createFSStream 函数
+
+- `function createFSStream(stream: IStream): fileIo.Stream` 将 IStream 转换为官方文件流
+
+---
+
+## 压缩流 (namespace compression)
+
+### DeflateStream 类
+
+DEFLATE 压缩/解压缩流
+
+**构造函数：**
+
+- `new DeflateStream(stream:base.IStream,mode:DeflateStreamMode, option ? : DeflateStreamOption)`
+
+**选项参数：**
+
+```typescript
+interface DeflateStreamOption {
+leaveOpen?: boolean; // 是否保持底层流打开
+windowBits?: number; // 窗口大小（默认-15）
+bufferSize?: number; // 缓冲区大小
+compressionLevel?: number // 压缩等级
+}
+```
+
+### Deflator 类
+
+DEFLATE 压缩工具
+
+**静态方法：**
+
+- `static deflate(chunk: BufferLike, option?: DeflatorOption): Uint8Array` 压缩缓冲区数据
+- `static createStream(option ? : DeflatorOption): DeflatorStream` 创建官方stream.duplex转换流
+
+**实例方法：**
+
+- `push(chunk: BufferLike, end ? : boolean):void` 将数据写入Deflator，end为true时结束
+- `result(): Uint8Array` 获取压缩结果
+- `reset(): void` 重置Deflator
+- `dispose(): void` 释放对象
+
+### Inflator 类
+
+DEFLATE 解压缩工具
+
+**静态方法：**
+
+- `static inflate(chunk: BufferLike):Uint8Array` 解压缓冲区数据
+- `static createStream(): InflatorStream` 创建官方stream.duplex转换流
+
+**实例方法：**
+
+- `push(chunk:BufferLike, end ? : boolean):void` 将数据写入Inflator，end为true时结束
+- `result():Uint8Array` 获取解压结果
+- `reset():void` 重置Inflator
+- `dispose(): void` 释放对象
+
+### ZipArchive 类
+
+ZIP 压缩包操作
+
+**构造函数：**
+
+- `new ZipArchive(stream: base.IStream, option ? : ZipArchiveOption)`
+- `new ZipArchive(path:string, option ? : ZipArchiveOption)`
+- `new ZipArchive(rawFile: resourceManager.RawFileDescriptor, password ? : string)`
+
+**主要方法：**
+
+- `get entries(): ZipArchiveEntry[]`
+- `createEntry(entryName: string, compressionLevel ? : number):ZipArchiveEntry`
+- `close():void`
+
+**ZipArchiveEntry 方法：**
+
+- `open(): base.IStream`
+- `delete ():void`
+
+---
+
+## 使用示例
+
+### 文件流基础操作
+
+```typescript
+// 读取文件
+const fs = new base.FileStream("test.txt", base.FileMode.READ);
+const buffer = new Uint8Array(1024);
+const bytesRead = fs.read(buffer);
+fs.close();
+
+// 写入文件
+const outFs = new base.FileStream("output.txt", base.FileMode.CREATE | base.FileMode.WRITE);
+const data = new TextEncoder().encode("Hello World");
+outFs.write(data);
+outFs.close();
+```
+
+### 内存流操作
+
+```typescript
+const ms = new base.MemoryStream();
+ms.write(new TextEncoder().encode("Memory Stream Test"));
+ms.seek(0, base.SeekOrigin.Begin);
+const readBuffer = new Uint8Array(20);
+ms.read(readBuffer);
+console.log(new TextDecoder().decode(readBuffer));
+```
+
+### 使用 DEFLATE 压缩
+
+```typescript
+// 压缩文件
+const source = new base.FileStream("source.txt", base.FileMode.READ);
+const compressed = new base.FileStream("compressed.deflate", base.FileMode.CREATE);
+const deflateStream = new compression.DeflateStream(
+  compressed,
+  compression.DeflateStreamMode.Compress,
+  { compressionLevel: compression.CompressionLevel.BEST_COMPRESSION }
+);
+source.copyTo(deflateStream);
+deflateStream.close();
+source.close();
+
+// 解压文件
+const decompressed = new base.FileStream("decompressed.txt", base.FileMode.CREATE);
+const inflateStream = new compression.DeflateStream(
+  new base.FileStream("compressed.deflate", base.FileMode.READ),
+  compression.DeflateStreamMode.Decompress
+);
+inflateStream.copyTo(decompressed);
+inflateStream.close();
+decompressed.close();
+```
+
+### ZIP 压缩包操作
+
+```typescript
+// 创建 ZIP 文件
+const zip = new compression.ZipArchive("test.zip", { mode: ZipArchiveMode.Create });
+const entry = zip.createEntry("data.txt");
+const stream = entry.open();
+stream.write(new TextEncoder().encode("ZIP File Content"));
+stream.close();
+zip.close();
+
+// 读取 ZIP 文件
+const zipReader = new compression.ZipArchive("test.zip");
+for (const entry of zipReader.entries) {
+  const stream = entry.open();
+  const buffer = new Uint8Array(entry.uncompressedSize);
+  stream.read(buffer);
+  console.log(`File: ${entry.fullName}, Content: ${new TextDecoder().decode(buffer)}`);
+  stream.close();
+}
+zipReader.close();
+
+```
+
+### Deflator/Inflator
+
+```typescript
 //let buffer = new Uint8Array(1000);
 //deflate压缩数据
 let result = compression.Deflator.deflate(buffer);
@@ -203,74 +298,15 @@ let inflateTransform = Inflator.createStream();
 //ps: 鸿蒙好像没提供pipeline方法  
 rs.pipe(deflateTransform);
 deflateTransform.pipe(ws);
-
-/**
- * ZipArchive参考
- */
-let zip:ZipArchive
-try {
-  let fs = new FileStream(path, FileMode.Write)
-
-  //参考zip使用zipcrypto加密
-  let zip = new ZipArchive(fs, { mode: ZipArchiveMode.Update, leaveOpen: false, password: '12345678' })
-
-  //获取所有entry
-  let entries: ZipArchiveEntry[] = zip.entries
-
-  //获取某个entry
-  let entry: ZipArchiveEntry | undefined = zip.getEntry('123.txt')
-
-  //假设entry存在
-  let stream: base.IStream = entry.open()
-
-  //读取全部解压数据
-  let ms = new MemoryStream()
-  let readBytes = 0
-  let buffer = new ArrayBuffer(4096)
-  while ((readBytes = stream.read(buffer)) != 0) {
-    ms.write(buffer, 0, readBytes)
-  }
-  let result: ArrayBuffer = ms.toArrayBuffer()
-  ms.close() //释放内存
-
-  //覆写内容，update模式下可以截断数据
-   stream.length = 0
-   stream.write(result)
-   
-   stream.close() //关闭流，保存写入的数据
-   
-
-
-} catch (e) {
-  //抛出异常
-} finally {
-  zip?.close()
-}
-
-
-
 ```
 
+### 将IStream转换成官方fs.Stream
+
+```typescript
+base.createFSStream(new base.MemoryStream());
+```
+
+## 如果使用遇到问题
 
 ---
-LICENSE
-
-(C) 1995-2024 Jean-loup Gailly and Mark Adler
-
-This software is provided 'as-is', without any express or implied
-warranty. In no event will the authors be held liable for any damages
-arising from the use of this software.
-
-Permission is granted to anyone to use this software for any purpose,
-including commercial applications, and to alter it and redistribute it
-freely, subject to the following restrictions:
-
-1. The origin of this software must not be misrepresented; you must not
-   claim that you wrote the original software. If you use this software
-   in a product, an acknowledgment in the product documentation would be
-   appreciated but is not required.
-
-2. Altered source versions must be plainly marked as such, and must not be
-   misrepresented as being the original software.
-
-3. This notice may not be removed or altered from any source distribution.
+### 使用过程中发现任何问题都可以提 [Issue](https://gitee.com/jiemoccc/jemoc-memory/issues)

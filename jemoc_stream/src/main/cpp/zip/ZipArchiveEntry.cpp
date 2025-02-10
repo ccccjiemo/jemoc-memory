@@ -290,9 +290,7 @@ IStream *ZipArchiveEntry::getDataDecompressor(IStream *stream) {
         decompressor =
             new DeflateStream(stream, DeflateMode_Decompress, -15, m_compression_level, false, 8192, uncompressedSize);
     }
-    if (getIsEncrypted()) {
-        decompressor = new ZipCryptoStream(decompressor, CryptoMode_Decode, m_archive->getPassword(), false, crc, 8192);
-    }
+  
     return decompressor;
 }
 
@@ -535,6 +533,10 @@ void ZipArchiveEntry::Export(napi_env env, napi_value exports) {
         DEFINE_NAPI_FUNCTION("isOpened", nullptr, JSGetIsOpened, nullptr, nullptr),
         DEFINE_NAPI_FUNCTION("crc32", nullptr, JSGetCRC, nullptr, nullptr),
         DEFINE_NAPI_FUNCTION("delete", JSDelete, nullptr, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("isDeleted", nullptr, JSGetIsDeleted, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("uncompressedSize", nullptr, JSGetUnCompressedSize, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("compressedSize", nullptr, JSGetCompressedSize, nullptr, nullptr)
+
     };
     napi_value napi_cons = nullptr;
     NAPI_CALL(env, napi_define_class(env, ClassName.c_str(), NAPI_AUTO_LENGTH, JSConstructor, nullptr,
@@ -604,13 +606,15 @@ void ZipArchiveEntry::releaseJSEntry(napi_env env) {
     NAPI_CALL(env, napi_get_reference_value(env, jsEntry, &value))
     if (value == nullptr)
         return;
-    void *_this = nullptr;
-    NAPI_CALL(env, napi_remove_wrap(env, value, &_this))
+
     uint ref_count = 0;
     NAPI_CALL(env, napi_reference_unref(env, jsEntry, &ref_count))
     if (ref_count > 0) {
         NAPI_CALL(env, napi_delete_reference(env, jsEntry))
     }
+    void *_this = nullptr;
+    NAPI_CALL(env, napi_remove_wrap(env, value, &_this))
+
 
     jsEntry = nullptr;
 }
@@ -750,6 +754,29 @@ napi_value ZipArchiveEntry::JSGetIsDeleted(napi_env env, napi_callback_info info
     bool value = entry == nullptr;
     napi_value result = nullptr;
     NAPI_CALL(env, napi_get_boolean(env, value, &result))
+    return result;
+}
+
+napi_value ZipArchiveEntry::JSGetUnCompressedSize(napi_env env, napi_callback_info info) {
+    GET_ZIPARCHIVE_ENTRY_INFO_WITH_ENTRY(0)
+    napi_value result = nullptr;
+    long size = 0;
+    entry->getArchive()->getMode();
+    if (entry->getArchive()->getMode() != ZipArchiveMode_Create && !entry->m_everOpenedForWrite) {
+        size = entry->uncompressedSize;
+    }
+    NAPI_CALL(env, napi_create_int64(env, size, &result));
+    return result;
+}
+napi_value ZipArchiveEntry::JSGetCompressedSize(napi_env env, napi_callback_info info) {
+    GET_ZIPARCHIVE_ENTRY_INFO_WITH_ENTRY(0)
+    napi_value result = nullptr;
+    long size = 0;
+    entry->getArchive()->getMode();
+    if (entry->getArchive()->getMode() != ZipArchiveMode_Create && !entry->m_everOpenedForWrite) {
+        size = entry->compressedSize;
+    }
+    NAPI_CALL(env, napi_create_int64(env, size, &result));
     return result;
 }
 

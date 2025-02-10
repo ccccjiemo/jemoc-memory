@@ -5,6 +5,7 @@ import { stream, util } from "@kit.ArkTS";
 interface DeflatorOption {
   windowBits?: number;
   compressionLevel?: number;
+  bufferSize?: number;
 }
 
 
@@ -25,7 +26,8 @@ export class Deflator {
     this._deflateStream = new DeflateStream(this._cache, DeflateStreamMode.Compress, {
       leaveOpen: true,
       windowBits: this._windowBits,
-      compressionLevel: this._compressionLevel
+      compressionLevel: this._compressionLevel,
+      bufferSize: option?.bufferSize
     })
 
   }

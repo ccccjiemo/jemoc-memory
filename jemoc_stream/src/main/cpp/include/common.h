@@ -69,7 +69,11 @@ static long getLong(napi_env env, napi_value value) {
 
 static int getInt(napi_env env, napi_value value) {
     int result = 0;
-    napi_get_value_int32(env, value, &result);
+    napi_valuetype isNum;
+    NAPI_CALL(env, napi_typeof(env, value, &isNum))
+    if (isNum == napi_number) {
+        NAPI_CALL(env, napi_get_value_int32(env, value, &result))
+    }
     return result;
 }
 
@@ -149,21 +153,21 @@ static double dostime_to_unix_timestamp(uint32_t dostime) {
     uint16_t dos_date = static_cast<uint16_t>(dostime >> 16);
     uint16_t dos_time = static_cast<uint16_t>(dostime & 0xFFFF);
 
-    struct tm t = { 0 }; // 初始化为0
-    t.tm_sec = (dos_time & 0x1F) * 2;            // 5 bits for seconds (0-29, representing 0-58 seconds)
-    t.tm_min = (dos_time >> 5) & 0x3F;           // 6 bits for minutes (0-59)
-    t.tm_hour = (dos_time >> 11) & 0x1F;         // 5 bits for hours (0-23)
-    t.tm_mday = dos_date & 0x1F;                 // 5 bits for day of month (1-31)
-    t.tm_mon = ((dos_date >> 5) & 0x0F) - 1;     // 4 bits for month (1-12, 0-11 for tm_mon)
-    t.tm_year = ((dos_date >> 9) & 0x7F) + 80;   // 7 bits for year (from 1980, tm_year is years since 1900)
-    t.tm_isdst = -1;                             // Not considering daylight saving time
+    struct tm t = {0};                         // 初始化为0
+    t.tm_sec = (dos_time & 0x1F) * 2;          // 5 bits for seconds (0-29, representing 0-58 seconds)
+    t.tm_min = (dos_time >> 5) & 0x3F;         // 6 bits for minutes (0-59)
+    t.tm_hour = (dos_time >> 11) & 0x1F;       // 5 bits for hours (0-23)
+    t.tm_mday = dos_date & 0x1F;               // 5 bits for day of month (1-31)
+    t.tm_mon = ((dos_date >> 5) & 0x0F) - 1;   // 4 bits for month (1-12, 0-11 for tm_mon)
+    t.tm_year = ((dos_date >> 9) & 0x7F) + 80; // 7 bits for year (from 1980, tm_year is years since 1900)
+    t.tm_isdst = -1;                           // Not considering daylight saving time
 
     return static_cast<double>(mktime(&t)) * 1000.0; // 转换为毫秒
 }
 
 static uint32_t unix_timestamp_to_dostime(double unix_timestamp) {
     time_t seconds = static_cast<time_t>(unix_timestamp / 1000.0);
-    struct tm* t = localtime(&seconds);
+    struct tm *t = localtime(&seconds);
 
     uint16_t dos_date = (t->tm_mday & 0x1F) | ((t->tm_mon + 1) << 5 & 0x1E0) | ((t->tm_year - 80) << 9 & 0xFE00);
     uint16_t dos_time = (t->tm_sec / 2 & 0x1F) | (t->tm_min << 5 & 0x7E0) | (t->tm_hour << 11 & 0xF800);
@@ -173,7 +177,7 @@ static uint32_t unix_timestamp_to_dostime(double unix_timestamp) {
 
 static uint32_t get_current_dostime() {
     time_t now = time(nullptr);
-    struct tm* t = localtime(&now);
+    struct tm *t = localtime(&now);
 
     uint16_t dos_date = (t->tm_mday & 0x1F) | ((t->tm_mon + 1) << 5 & 0x1E0) | ((t->tm_year - 80) << 9 & 0xFE00);
     uint16_t dos_time = (t->tm_sec / 2 & 0x1F) | (t->tm_min << 5 & 0x7E0) | (t->tm_hour << 11 & 0xF800);

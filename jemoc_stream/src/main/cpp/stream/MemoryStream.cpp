@@ -10,6 +10,7 @@
 std::string MemoryStream::ClassName = "MemoryStream";
 
 MemoryStream::MemoryStream() {
+//     m_cache = new std::vector<byte>();
     setCapacity(1);
     m_canWrite = true;
     m_canSeek = true;
@@ -19,6 +20,7 @@ MemoryStream::MemoryStream() {
 }
 
 MemoryStream::MemoryStream(size_t capacity) {
+//     m_cache = new std::vector<byte>();
     setCapacity(capacity);
     m_canWrite = true;
     m_canSeek = true;
@@ -41,7 +43,9 @@ long MemoryStream::read(void *buffer, long offset, size_t count) {
         return 0;
     size_t readBytes = m_length - m_position;
     readBytes = std::min(readBytes, count);
-    memcpy(offset_pointer(buffer, offset), m_cache.data() + m_position, readBytes);
+//     memcpy(offset_pointer(buffer, offset), m_cache->data() + m_position, readBytes);
+    memcpy(offset_pointer(buffer, offset), mm_cache + m_position, readBytes);
+
     m_position += readBytes;
     return readBytes;
 }
@@ -50,7 +54,9 @@ long MemoryStream::write(void *buffer, long offset, size_t count) {
     if (count == 0)
         return 0;
     ensureCapacity(m_position + count);
-    void *dest = m_cache.data() + m_position;
+//     void *dest = m_cache->data() + m_position;
+    void *dest = mm_cache + m_position;
+
     void *source = offset_pointer(buffer, offset);
     memcpy(dest, source, count);
     m_position += count;
@@ -69,8 +75,21 @@ void MemoryStream::ensureCapacity(long capacity) {
 }
 
 void MemoryStream::setCapacity(long capacity) {
-    m_capacity = capacity;
-    m_cache.resize(m_capacity);
+//     m_capacity = capacity;
+//     m_cache->resize(m_capacity);
+    m_capacity = align4k(capacity);
+    byte *buffer = new byte[m_capacity];
+
+    if (mm_cache == nullptr) {
+        mm_cache = buffer;
+        return;
+    }
+
+    byte *temp = mm_cache;
+    memcpy(buffer, temp, std::min(m_length, capacity));
+    mm_cache = buffer;
+    delete[] temp;
+    temp = nullptr;
 }
 long MemoryStream::getCapacity() const { return m_capacity; }
 
@@ -78,8 +97,18 @@ void MemoryStream::close() {
     if (m_closed)
         return;
     IStream::close();
-    m_cache.clear();
-    m_cache.resize(0);
+//     m_cache.clear();
+//     m_cache.erase(m_cache.begin(), m_cache.end());
+//     m_cache.resize(0);
+//     m_cache->erase(m_cache->begin(), m_cache->end());
+//     m_cache->shrink_to_fit();
+//     m_cache->resize(0);
+//     delete m_cache;
+//     m_cache = nullptr;
+    if (mm_cache != nullptr) {
+        delete[] mm_cache;
+        mm_cache = nullptr;
+    }
 }
 
 
@@ -125,8 +154,7 @@ napi_value MemoryStream::JSToArrayBuffer(napi_env env, napi_callback_info info) 
     napi_value buffer = nullptr;
     long length = stream->getLength();
     napi_create_arraybuffer(env, length, &data, &buffer);
-    uint8_t* _buffer = static_cast<uint8_t*>(data) ;
-    memcpy(data, static_cast<MemoryStream *>(stream)->m_cache.data(), length);
+    memcpy(data, ((MemoryStream *)stream)->getData(), length);
     return buffer;
 }
 

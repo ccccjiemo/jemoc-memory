@@ -1,3 +1,5 @@
+import { resourceManager } from "@kit.LocalizationKit";
+
 export type BufferLike = ArrayBufferLike | Uint8Array;
 
 export enum SeekOrigin { Begin, Current, End }
@@ -96,6 +98,11 @@ export class MemoryStream implements IStream {
 
 export class FileStream implements IStream {
   constructor(path: string, mode?: number)
+
+  constructor(fd: number, mode?: number)
+
+  constructor(rawFile: resourceManager.RawFileDescriptor)
+
 
   get canRead(): boolean;
 
@@ -253,6 +260,10 @@ export class ZipArchiveEntry {
   get isOpened(): boolean
 
   get isDeleted(): boolean
+
+  get uncompressedSize(): number
+
+  get compressedSize(): number;
 }
 
 export class ZipArchive {

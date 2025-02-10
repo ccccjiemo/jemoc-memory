@@ -16,7 +16,7 @@ napi_ref ZipCryptoStream::cons = nullptr;
 ZipCryptoStream::ZipCryptoStream(IStream *stream, CryptoMode mode, const std::string &password, bool leaveOpen,
                                  unsigned long crc, size_t bufferSize)
     : m_stream(stream), m_mode(mode), m_password(password), m_leaveOpen(leaveOpen), m_crc(crc),
-      m_buffer_Size(bufferSize) {
+      m_buffer_Size(bufferSize),m_everRead(false), m_everWrite(false) {
     m_canWrite = m_mode == CryptoMode::CryptoMode_Encode;
     m_canRead = m_mode == CryptoMode::CryptoMode_Decode;
     m_canSeek = false;
@@ -31,7 +31,7 @@ ZipCryptoStream::ZipCryptoStream(IStream *stream, CryptoMode mode, const std::st
 
 ZipCryptoStream::ZipCryptoStream(IStream *stream, CryptoMode mode, ZipArchiveEntry *entry, bool leaveOpen,
                                  size_t bufferSize)
-    : m_stream(stream), m_mode(mode), m_entry(entry), m_leaveOpen(leaveOpen), m_buffer_Size(bufferSize) {
+    : m_stream(stream), m_mode(mode), m_entry(entry), m_leaveOpen(leaveOpen), m_buffer_Size(bufferSize),m_everRead(false), m_everWrite(false) {
     m_canWrite = m_mode == CryptoMode::CryptoMode_Encode;
     m_canRead = m_mode == CryptoMode::CryptoMode_Decode;
     m_canSeek = false;
@@ -91,26 +91,8 @@ long ZipCryptoStream::read(void *buffer, long offset, size_t count) {
     ensureNotClose();
     checkStream();
 
-//     size_t needRead = 0;
-//     size_t bytesRead = 0;
-//     if (m_total_read < 12) {
-//         needRead = 12 - m_total_read;
-//         uint8_t *_buffer = new uint8_t[needRead];
-//         bytesRead = m_stream->read(_buffer, 0, needRead);
-//         if (bytesRead == 0)
-//             return 0;
-//         decodeStream(_buffer, 0, bytesRead);
-//         m_total_read += bytesRead;
-//         if (bytesRead != needRead) {
-//             delete[] _buffer;
-//             return 0;
-//         } else {
-//             uint32_t verify1 = *(_buffer + needRead - 2);
-//             uint32_t verify2 = *(_buffer + needRead - 1);
-//             delete[] _buffer;
-//         }
-//     }
-    if (!m_everRead) {
+
+    if (!this->m_everRead) {
         uint8_t *buffer = new uint8_t[12];
         if (m_stream->read(buffer, 0, 12) != 12) {
             delete[] buffer;
@@ -124,6 +106,7 @@ long ZipCryptoStream::read(void *buffer, long offset, size_t count) {
         if ((((crc >> 16) & 0xff) != buffer[10]) || (((crc >> 24) & 0xff) != buffer[11])) {
             throw std::ios::failure("invalid password");
         }
+        this->m_everRead = true;
     }
 
     size_t bytesRead = m_stream->read(buffer, offset, count);

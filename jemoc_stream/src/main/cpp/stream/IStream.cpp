@@ -178,7 +178,7 @@ napi_value IStream::JSClose(napi_env env, napi_callback_info info) {
     }
     stream->close();
     void *result = nullptr;
-    napi_unwrap(env, _this, &result);
+    napi_remove_wrap(env, _this, &result);
     return nullptr;
 }
 
