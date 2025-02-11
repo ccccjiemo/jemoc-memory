@@ -33,6 +33,7 @@ ohpm install @jemoc/stream
     - [FileMode 枚举](#filemode-枚举)
     - [FileStream 类](#filestream-类)
     - [MemoryStream 类](#memorystream-类)
+    - [MemfdStream 类](#memfdstream-类)
     - [createFSStream 函数](#createfsstream-函数)
 - [压缩流 (命名空间 compression)](#压缩流-namespace-compression)
     - [DeflateStream 类](#deflatestream-类)
