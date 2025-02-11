@@ -1,5 +1,6 @@
 #include "stream/DeflateStream.h"
 #include "stream/FileStream.h"
+#include "stream/MemfdStream.h"
 #include "stream/MemoryStream.h"
 #include "zip/ZipArchiveEntry.h"
 #include "zip/ZipCryptoStream.h"
@@ -9,6 +10,7 @@
 
 EXTERN_C_START
 static napi_value Init(napi_env env, napi_value exports) {
+    MemfdStream::Export(env, exports);
     MemoryStream::Export(env, exports);
     FileStream::Export(env, exports);
     DeflateStream::Export(env, exports);

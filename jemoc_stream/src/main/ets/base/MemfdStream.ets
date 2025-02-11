@@ -1,0 +1,1 @@
+export { MemfdStream } from 'libjemoc_stream.so'

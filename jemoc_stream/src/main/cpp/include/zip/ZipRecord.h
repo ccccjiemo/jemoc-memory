@@ -82,5 +82,12 @@ struct ZipLocalFileHeader {
     static bool trySkip(IStream *stream);
 } __attribute__((packed));
 
+struct InfoZIPUnicodeCommentExtraField {
+    byte version;
+    uint crc32;
+    std::string data;
+    static bool tryRead(ZipGenericExtraField *field, InfoZIPUnicodeCommentExtraField *result);
+};
+
 namespace ZipCentralDirectory {}
 #endif // JEMOC_STREAM_TEST_ZIPENDOFCENTRALDIRECTORYRECORD_H

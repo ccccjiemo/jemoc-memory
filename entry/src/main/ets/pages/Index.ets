@@ -29,6 +29,40 @@ struct Index {
           })
 
         })
+      Button('test ziparchive')
+        .onClick(async () => {
+          try {
+            const context = getContext(this);
+            const rawFile = context.resourceManager.getRawFdSync('妖精の尾巴 第01卷.zip');
+            const fs = new base.FileStream(rawFile);
+            const zip = new compression.ZipArchive(fs);
+            const entry = zip.entries[1];
+            const fullname = entry.fullName;
+            const buffer = new ArrayBuffer(entry.uncompressedSize);
+            const stream = entry.open();
+            let totalRead = 0;
+            let ms = new base.MemfdStream();
+            let start = Date.now();
+            // while (totalRead < entry.uncompressedSize) {
+            //   let actualRead = await stream.readAsync(buffer, totalRead, entry.uncompressedSize - totalRead);
+            //   totalRead += actualRead;
+            // }
+            await stream.copyToAsync(ms);
+            let b1 = ms.toArrayBuffer();
+            let end = Date.now();
+
+            console.log(`${end - start}`);
+            //await stream.closeAsync();
+            const file =
+              await fileIo.open(context.cacheDir + '/0002.jpg', fileIo.OpenMode.CREATE | fileIo.OpenMode.WRITE_ONLY);
+            await fileIo.write(file.fd, b1);
+            await fileIo.close(file);
+            ms.close();
+          } catch (e) {
+            console.log(e);
+          }
+
+        })
       Button('test')
         .onClick(async () => {
           const rawFd = await getContext(this).resourceManager.getRawFd('test(crypto).zip');

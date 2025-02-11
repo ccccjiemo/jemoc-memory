@@ -1,10 +1,20 @@
+## [1.0.5] - 2025-02-11
+
+- 新增MemfdStream，用于需要fd操作的场景
+
+## [1.0.4] - 2025-02-11
+
+- 修复ZipArchiveEntry的fullName编码是unicode时候乱码的错误
+- 更正声明文件中MemoryStream的构造函数声明
+
+---
+
 ## [1.0.3] - 2025-02-10
 
 - 修复ZipArchive在ZipCrypto加密无法解压问题
 - FileStream增加RawFile支持(仅支持读取)
 - ZipArchive增加RawFile支持(仅支持Read模式)
 - 让DeepSeek帮我重写README.md
--
 
 ---
 
@@ -28,4 +38,3 @@
 
 - 发布初版
 
----

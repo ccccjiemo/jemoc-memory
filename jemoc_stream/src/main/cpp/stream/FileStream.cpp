@@ -65,6 +65,7 @@ FileStream::FileStream(const int &fd, FILE_MODE mode, long bufferSize) : m_mode(
     }
     if ((mode & FILE_MODE_TRUNC) || ((mode & FILE_MODE_CREATE))) {
         open_mode[0] = 'w';
+        m_canSetLength = true;
     }
 
     FILE *fp = fdopen(fd, open_mode);

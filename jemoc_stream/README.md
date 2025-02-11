@@ -28,6 +28,7 @@ ohpm install @jemoc/stream
 
 - [基础流 (命名空间 base)](#基础流-namespace-base)
     - [IStream 接口](#istream-接口)
+    - [BufferLike 类型](#bufferlike-类型)
     - [SeekOrigin 枚举](#seekorigin-枚举)
     - [FileMode 枚举](#filemode-枚举)
     - [FileStream 类](#filestream-类)
@@ -70,6 +71,12 @@ ohpm install @jemoc/stream
 - `close(): void`
 - `closeAsync(): Promise<void>`
 
+### BufferLike 类型
+
+```typescript
+type BufferLike = ArrayBufferLike | Uint8Array
+```
+
 ### SeekOrigin 枚举
 
 ```typescript
@@ -106,9 +113,30 @@ CREATE = 0x08 // 文件不存在时创建
 
 内存流实现，继承自 IStream
 
+**构造函数：**
+
+- `new MemoryStream(capacity?: number)` 指定初始容量创建内存流
+- `new MemoryStream(buffer: BufferLike)` 创建内存流并将缓冲数据写入
+
 **特有方法：**
 
 - `toArrayBuffer(): ArrayBuffer`  返回内存流数据（不修改指针位置）
+
+### MemfdStream 类
+
+内存流实现，继承自 IStream,此版本用于创建基于内存的文件描述符，使用场景比如文件数据在内存，使用image工具创建imageSource时传入fd用于解码;使用官方rcp发送数据时，通过fd创建fs.Stream等。
+
+**构造函数：**
+
+- `new MemfdStream(buffer?: BufferLike)` 指定缓冲初始化内存流
+
+**特有方法：**
+
+- `toArrayBuffer(): ArrayBuffer`  返回内存流数据（不修改指针位置）
+
+**特有属性：**
+
+- `get fd(): number`  获取文件描述符fd
 
 ### createFSStream 函数
 
@@ -182,13 +210,26 @@ ZIP 压缩包操作
 **主要方法：**
 
 - `get entries(): ZipArchiveEntry[]`
-- `createEntry(entryName: string, compressionLevel ? : number):ZipArchiveEntry`
+- `createEntry(entryName: string, compressionLevel ? : number):ZipArchiveEntry` 在非Read模式下可使用
 - `close():void`
 
 **ZipArchiveEntry 方法：**
 
 - `open(): base.IStream`
 - `delete ():void`
+
+**ZipArchiveEntry 属性：**
+
+- `get uncompressedSize(): number` 仅在Read模式或未调用open的Update模式能获取到正确值，否则返回0
+- `get compressedSize(): number` 仅在Read模式或未调用open的Update模式能获取到正确值，否则返回0
+- `get isOpened(): boolean`
+- `get fullName(): string`
+- `set fullName(value: string)`
+- `get isEncrypted(): boolean`
+- `get compressionLevel(): number`
+- `get fileComment(): string`
+- `get lastModifier(): Date`
+- `get crc32(): number`
 
 ---
 
@@ -306,7 +347,35 @@ deflateTransform.pipe(ws);
 base.createFSStream(new base.MemoryStream());
 ```
 
+### 将数据拷贝到ArrayBuffer
+
+#### 方式1 - 通过read方法分段读取
+
+```typescript
+const bufferSize = 10000; //假设已知要接受10000字节数据
+let buffer = new ArrayBuffer(bufferSize);
+const fs = new base.FileStream("1.txt");
+let actualRead = 0;
+let totalRead = 0;
+while (totalRead < bufferSize) {
+  actualRead = fs.read(buffer, totalRead, bufferSize - totalRead);
+  totalRead += actualRead;
+}
+```
+
+#### 方式2 - 通过copyTo方法直接读取
+
+方式2相比方式1会快上至少一倍
+
+```typescript
+const ms = new base.MemoryStream(10000); //提前预设容量减少扩容次数
+const fs = new base.FileStream("1.txt");
+fs.copyTo(ms);
+const buffer = ms.toArrayBuffer();
+```
+
 ## 如果使用遇到问题
 
 ---
+
 ### 使用过程中发现任何问题都可以提 [Issue](https://gitee.com/jiemoccc/jemoc-memory/issues)

@@ -97,6 +97,7 @@ napi_value IStream::JSSeek(napi_env env, napi_callback_info info) {
 
     } catch (const std::ios_base::failure &e) {
         napi_throw_error(env, tagName, e.what());
+        return nullptr;
     }
 }
 
@@ -126,6 +127,9 @@ napi_value IStream::JSRead(napi_env env, napi_callback_info info) {
 napi_value IStream::JSSetLength(napi_env env, napi_callback_info info) {
     GET_JS_INFO(1)
     long length = getLong(env, argv[0]);
+
+    if (!stream->m_canSetLength)
+        napi_throw_error(env, tagName, "stream not supported set length");
 
     try {
         stream->setLength(length);

@@ -1,7 +1,10 @@
-import { IStream, SeekOrigin } from 'libjemoc_stream.so'
+import { IStream } from 'libjemoc_stream.so'
 import { fileIo as fs, ReadOptions, WriteOptions } from '@kit.CoreFileKit'
 import { AsyncCallback, BusinessError } from '@ohos.base'
 import { util } from '@kit.ArkTS';
+
+export enum SeekOrigin { Begin, Current, End }
+
 
 export function createFSStream(stream: IStream): fs.Stream {
   return new OHStream(stream);

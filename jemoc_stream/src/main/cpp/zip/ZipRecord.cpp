@@ -81,3 +81,28 @@ bool ZipLocalFileHeader::trySkip(IStream *stream) {
     stream->seek(header.fileNameLength + header.extraFieldLength, SeekOrigin::Current);
     return true;
 }
+
+bool InfoZIPUnicodeCommentExtraField::tryRead(ZipGenericExtraField *field, InfoZIPUnicodeCommentExtraField *result) {
+    // 不符合标签或者空指针返回
+    if (field == nullptr || field->tag != 0x7075)
+        return false;
+    uint pointer = 0;
+
+    // 读取版本
+    if (field->size < 1)
+        return false;
+
+    memcpy(&result->version, field->data, 1);
+    pointer++;
+
+    // 读取crc32
+    if (pointer + 4 > field->size)
+        return false;
+
+    memcpy(&result->crc32, field->data + pointer, 4);
+    pointer += 4;
+
+    std::string data((char *)(field->data + pointer), field->size - pointer);
+    result->data = data;
+    return true;
+}

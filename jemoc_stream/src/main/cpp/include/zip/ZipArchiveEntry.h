@@ -136,6 +136,8 @@ public:
 private:
     IStream *openingStream = nullptr;
 
+    bool isUnicodeFileName = false;
+
     int m_compression_level;
     ZipArchive *m_archive;
     bool isEncrypted;

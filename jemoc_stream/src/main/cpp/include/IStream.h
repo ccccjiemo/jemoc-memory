@@ -177,6 +177,7 @@ protected:
     bool m_canSeek;
     bool m_canGetLength;
     bool m_canGetPosition;
+    bool m_canSetLength;
     long m_position;
     long m_length;
     bool m_closed;

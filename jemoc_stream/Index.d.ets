@@ -264,6 +264,12 @@ declare namespace base {
    * 内存流，自动扩容
    */
   class MemoryStream implements IStream {
+    constructor(capacity: number)
+
+    constructor(buffer: BufferLike)
+
+    constructor()
+
     get canRead(): boolean;
 
     get canWrite(): boolean;
@@ -303,6 +309,52 @@ declare namespace base {
      * @returns
      */
     toArrayBuffer(): ArrayBuffer;
+  }
+
+  class MemfdStream implements IStream {
+    constructor(buffer?: BufferLike)
+
+    get canRead(): boolean;
+
+    get canWrite(): boolean;
+
+    get canSeek(): boolean;
+
+    get position(): number;
+
+    get length(): number;
+
+    set length(value: number);
+
+    copyTo(stream: IStream, bufferSize?: number | undefined): void;
+
+    copyToAsync(stream: IStream, bufferSize?: number | undefined): Promise<void>;
+
+    seek(offset: number, origin: SeekOrigin): void;
+
+    read(buffer: BufferLike, offset?: number | undefined, count?: number | undefined): number;
+
+    readAsync(buffer: BufferLike, offset?: number | undefined, count?: number | undefined): Promise<number>;
+
+    write(buffer: BufferLike, offset?: number | undefined, count?: number | undefined): number;
+
+    writeAsync(buffer: BufferLike, offset?: number | undefined, count?: number | undefined): Promise<number>;
+
+    flush(): void;
+
+    flushAsync(): Promise<void>;
+
+    close(): void;
+
+    closeAsync(): Promise<void>;
+
+    /**
+     * 返回流中的所有数据，不修改指针位置
+     * @returns
+     */
+    toArrayBuffer(): ArrayBuffer;
+
+    get fd(): number;
   }
 }
 
@@ -401,11 +453,11 @@ declare namespace compression {
      */
     get length(): number;
 
-    /**
-     * 所有模式不可设置流长度
-     * @param value
-     */
-    set length(value: number);
+    // /**
+    //  * 所有模式不可设置流长度
+    //  * @param value
+    //  */
+    // set length(value: number);
 
     /**
      * 解压模式可用
@@ -731,9 +783,6 @@ declare namespace compression {
      */
     set compressionLevel(value: number)
 
-    // get compressionMethod(): number
-    //
-    // set compressionMethod(value: number)
 
     get fileComment(): string
 

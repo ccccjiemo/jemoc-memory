@@ -66,7 +66,7 @@ ZipArchiveEntry::ZipArchiveEntry(ZipArchive *archive, const ZipCentralDirectoryR
     crc = record.crc;
     m_compression_level = mapCompressionLevel(flags, compressionMethod);
 
-    fileName = new char[record.fileNameLength];
+    fileName = new char[record.fileNameLength + 1]{'\0'};
     fileNameLength = record.fileNameLength;
     extraFieldLength = record.extraFieldLength;
     fileCommentLength = record.fileCommentLength;
@@ -77,7 +77,7 @@ ZipArchiveEntry::ZipArchiveEntry(ZipArchive *archive, const ZipCentralDirectoryR
         fields = ZipGenericExtraField::tryRead(cdExtraFields, record.extraFieldLength);
     }
     if (record.fileCommentLength > 0) {
-        fileComment = new char[record.fileCommentLength];
+        fileComment = new char[record.fileCommentLength + 1]{'\0'};
         archive->getArchiveStream()->read(fileComment, 0, record.fileCommentLength);
     }
     if (flags & GeneralPurposeBitFlag_DataDescriptor) {
@@ -190,10 +190,15 @@ uint ZipArchiveEntry::getCryptCRC() const { return getHasDataDescriptor() ? last
 std::string ZipArchiveEntry::getFullName() {
     if (m_stored_fullname.length() == 0) {
         for (auto it = fields.begin(); it != fields.end(); ++it) {
-            if ((*it)->tag == 0x7075) {
-                m_stored_fullname = std::string((char *)(*it)->data);
-                break;
+            InfoZIPUnicodeCommentExtraField field;
+            if (field.tryRead(*it, &field)) {
+                isUnicodeFileName = true;
+                m_stored_fullname = field.data;
+                return m_stored_fullname;
             }
+        }
+        if (GeneralPurposeBitFlag_UnicodeFileNameAndComment & flags) {
+            isUnicodeFileName = true;
         }
         m_stored_fullname = std::string(fileName);
     }
@@ -290,7 +295,7 @@ IStream *ZipArchiveEntry::getDataDecompressor(IStream *stream) {
         decompressor =
             new DeflateStream(stream, DeflateMode_Decompress, -15, m_compression_level, false, 8192, uncompressedSize);
     }
-  
+
     return decompressor;
 }
 

@@ -17,6 +17,7 @@ MemoryStream::MemoryStream() {
     m_canRead = true;
     m_canGetPosition = true;
     m_canGetLength = true;
+    m_canSetLength = true;
 }
 
 MemoryStream::MemoryStream(size_t capacity) {
@@ -27,6 +28,7 @@ MemoryStream::MemoryStream(size_t capacity) {
     m_canRead = true;
     m_canGetPosition = true;
     m_canGetLength = true;
+    m_canSetLength = true;
 }
 
 
@@ -123,18 +125,20 @@ napi_ref MemoryStream::cons = nullptr;
 napi_value MemoryStream::JSConstructor(napi_env env, napi_callback_info info) {
     GET_JS_INFO_WITHOUT_STREAM(1);
     napi_valuetype type;
-    napi_typeof(env, argv[0], &type);
+    NAPI_CALL(env, napi_typeof(env, argv[0], &type))
     MemoryStream *stream = new MemoryStream();
-    if (type == napi_number) {
-        long capacity = getLong(env, argv[0]);
-        stream->setCapacity(capacity);
-    } else {
-        void *data = nullptr;
-        size_t length = 0;
-        getBuffer(env, argv[0], &data, &length);
-        if (data != nullptr) {
-            stream->setCapacity(length);
-            stream->write(data, 0, length);
+    if (type != napi_undefined) {
+        if (type == napi_number) {
+            long capacity = getLong(env, argv[0]);
+            stream->setCapacity(capacity);
+        } else {
+            void *data = nullptr;
+            size_t length = 0;
+            getBuffer(env, argv[0], &data, &length);
+            if (data != nullptr) {
+                stream->setCapacity(length);
+                stream->write(data, 0, length);
+            }
         }
     }
 

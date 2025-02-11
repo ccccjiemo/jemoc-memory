@@ -322,3 +322,45 @@ export class Inflater {
 
   get isGzipInput(): boolean
 }
+
+export class MemfdStream implements IStream {
+  constrructor(buffer: BufferLike)
+
+  get canRead(): boolean;
+
+  get canWrite(): boolean;
+
+  get canSeek(): boolean;
+
+  get position(): number;
+
+  get length(): number;
+
+  set length(value: number);
+
+  copyTo(stream: IStream, bufferSize?: number | undefined): void;
+
+  copyToAsync(stream: IStream, bufferSize?: number | undefined): Promise<void>;
+
+  seek(offset: number, origin: number): void;
+
+  read(buffer: BufferLike, offset?: number | undefined, count?: number | undefined): number;
+
+  readAsync(buffer: BufferLike, offset?: number | undefined, count?: number | undefined): Promise<number>;
+
+  write(buffer: BufferLike, offset?: number | undefined, count?: number | undefined): number;
+
+  writeAsync(buffer: BufferLike, offset?: number | undefined, count?: number | undefined): Promise<number>;
+
+  flush(): void;
+
+  flushAsync(): Promise<void>;
+
+  close(): void;
+
+  closeAsync(): Promise<void>;
+
+  toArrayBuffer(): ArrayBuffer;
+
+  get fd(): number;
+}
