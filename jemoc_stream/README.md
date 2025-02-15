@@ -14,9 +14,10 @@
 Deflator、Inflator可以直接进行deflate压缩和inflate解压和创建鸿蒙stream.Transform转换流
 
 gzip加解压缩通过设置windowBits实现。所有方法windowBits默认-15
-___
 
 ### 如何安装
+
+___
 
 ```shell
 ohpm install @jemoc/stream
@@ -34,17 +35,23 @@ ohpm install @jemoc/stream
     - [FileStream 类](#filestream-类)
     - [MemoryStream 类](#memorystream-类)
     - [MemfdStream 类](#memfdstream-类)
-    - [createFSStream 函数](#createfsstream-函数)
+    - [createFSStream 方法](#createfsstream-方法)
+    - [createStreamChunk 方法](#createstreamchunk-方法)
+- [流工具 (命名空间 streamUtils)](#流工具-namespace-streamutils)
+  - [streamToReadable 方法](#streamtoreadable-方法)
+  - [streamToWriteable 方法](#streamtoreadable-方法)
+  - [createMultiWritable 方法](#createmultiwritable)
 - [压缩流 (命名空间 compression)](#压缩流-namespace-compression)
     - [DeflateStream 类](#deflatestream-类)
     - [Deflator 类](#deflator-类)
     - [Inflator 类](#inflator-类)
     - [ZipArchive 类](#ziparchive-类)
+- [缓冲池 (命名空间 bufferpool) 实验阶段](#缓冲池-namespace-bufferpool-实验阶段)
 - [使用示例](#使用示例)
 
----
-
 ## 基础流 (namespace base)
+
+---
 
 ### IStream 接口
 
@@ -134,18 +141,40 @@ CREATE = 0x08 // 文件不存在时创建
 **特有方法：**
 
 - `toArrayBuffer(): ArrayBuffer`  返回内存流数据（不修改指针位置）
+- `sendFile(fd: number): void` 将数据通过文件描述符发送到文件
 
 **特有属性：**
 
 - `get fd(): number`  获取文件描述符fd
 
-### createFSStream 函数
+### createFSStream 方法
 
 - `function createFSStream(stream: IStream): fileIo.Stream` 将 IStream 转换为官方文件流
 
+### createStreamChunk 方法
+
+- `function createStreamChunk(stream: IStream, chunkSize?: number): ChunkIterator` 将可读流创建分块迭代器，用于数据流迭代操作
+- `chunkSize` 默认大小8kb
+
+## 流工具 (namespace streamUtils)
+
 ---
+### streamToReadable
+
+`function streamToReadable(stream: base.IStream): stream.Readable` 将可写流转换成stream.Writable
+
+### streamToWriteable
+
+`function streamToWriteable(stream: base.IStream): stream.Writable`  将可写流转换成stream.Writable
+
+### createMultiWritable
+
+`function createMultiWritable(...stream: base.IStream[]): stream.Writable` 用于多路可写流，将可读流同时写入多个可写流
+
 
 ## 压缩流 (namespace compression)
+
+---
 
 ### DeflateStream 类
 
@@ -232,9 +261,60 @@ ZIP 压缩包操作
 - `get lastModifier(): Date`
 - `get crc32(): number`
 
+## 缓冲池 (namespace bufferpool) 实验阶段
+
 ---
+### BufferPool 抽象类
+```typescript
+abstract class BufferPool {
+  abstract acquire(size: number): ArrayBuffer
+  abstract release(buffer: ArrayBuffer): void
+  get stats(): BufferPoolStats
+
+  protected updateStats(acquiring: boolean): void
+}
+```
+***后续将会改变***
+```typescript
+abstract class BufferPool<TStats extends BufferPoolStats> { //通过泛型用于缓冲池返回更多信息，如命中率使用率等
+  abstract acquire(size?: number): ArrayBuffer | undefined //size改为可选，用于FixedBufferPool/RingBufferPool支持, 同步接口在创建失败时返回undefined
+  abstract acquireAsync(size?: number): Promise<ArrayBuffer> //异步接口用于长时间等待缓冲
+  abstract release(buffer: ArrayBuffer): void
+  get stats(): TStats
+
+  protected updateStats(state: BufferState, size: number): void //用于记录创建、归还、复用、淘汰等信息
+}
+```
+
+***BufferPoolStats*** 
+```typescript
+interface BufferPoolStats {
+  total: number
+  used: number
+}
+```
+
+- `acquire(size?: number): ArrayBuffer` 申请size大小的ArrayBuffer
+- `release(buffer: ArrayBuffer)` 归还创建的缓冲
+- `get stats()` 获取缓冲池状态信息
+
+### LruBufferPool(后续会改)
+***带LRU淘汰策略的BufferPool***
+```typescript
+class LruBufferPool extends BufferPool {
+  constructor(maxSize: number) //最大缓冲池大小
+
+  acquire(size: number): ArrayBuffer;
+
+  release(buffer: ArrayBuffer): void;
+}
+```
+
+### FixedBufferPool、DynamicBufferPool、RingBufferPool待实现
 
 ## 使用示例
+
+---
 
 ### 文件流基础操作
 
@@ -250,6 +330,16 @@ const outFs = new base.FileStream("output.txt", base.FileMode.CREATE | base.File
 const data = new TextEncoder().encode("Hello World");
 outFs.write(data);
 outFs.close();
+```
+### 使用迭代器读取流
+
+```typescript
+const fs = new FileStream('1.txt')
+const chunks = base.createStreamChunk(fs)
+for await (let buffer of chunks) {
+}
+for (let buffer of chunks) {
+}
 ```
 
 ### 内存流操作

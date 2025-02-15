@@ -18,7 +18,6 @@ Deflater::Deflater(int windowBits, int level, int strategy)
     zStream = new zng_stream{.zalloc = Z_NULL, .zfree = Z_NULL, .opaque = Z_NULL};
     int errCode = zng_deflateInit2(zStream, m_level, Z_DEFLATED, m_windowBits, getMemLevel(m_level), m_strategy);
 
-
     if (errCode == Z_OK)
         return;
 

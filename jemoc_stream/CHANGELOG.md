@@ -1,3 +1,11 @@
+## [1.1.0] - 2025-02-15
+
+- 修复MemfdStream创建的fd无法用于image.createImageSource问题
+- MemfdStream新增sendFile方法，用于将内存数据保存到文件
+- 新增streamUtils工具集，用于库提供与@ohos.stream转换
+- 新增实验性BufferPool
+- base命名空间下新增分块迭代器工具
+
 ## [1.0.5] - 2025-02-11
 
 - 新增MemfdStream，用于需要fd操作的场景

@@ -13,6 +13,7 @@
 #include <sys/types.h>
 #include <chrono>
 #include <ctime>
+#include <unordered_map>
 
 typedef unsigned char byte;
 class IStream;
@@ -190,4 +191,74 @@ static double get_current_unix_timestamp() {
     milliseconds ms = duration_cast<milliseconds>(system_clock::now().time_since_epoch());
     return static_cast<double>(ms.count());
 }
+
+template <typename K, typename V> class BiMap {
+private:
+    std::unordered_map<K, V> leftMap;
+    std::unordered_map<V, K> rightMap;
+
+public:
+    // 插入或更新键值对
+    void set(const K &key, const V &value) {
+        // 如果 key 已存在，先移除其旧的反向映射
+        auto itKey = leftMap.find(key);
+        if (itKey != leftMap.end()) {
+            rightMap.erase(itKey->second);
+        }
+        // 如果 value 已存在，先移除其旧的正向映射
+        auto itValue = rightMap.find(value);
+        if (itValue != rightMap.end()) {
+            leftMap.erase(itValue->second);
+        }
+        leftMap[key] = value;
+        rightMap[value] = key;
+    }
+
+    // 通过键获取值，返回是否找到
+    bool getValue(const K &key, V &value) const {
+        auto it = leftMap.find(key);
+        if (it != leftMap.end()) {
+            value = it->second;
+            return true;
+        }
+        return false;
+    }
+
+    // 通过值获取键，返回是否找到
+    bool getKey(const V &value, K &key) const {
+        auto it = rightMap.find(value);
+        if (it != rightMap.end()) {
+            key = it->second;
+            return true;
+        }
+        return false;
+    }
+
+    // 根据键删除映射
+    bool deleteByKey(const K &key) {
+        auto it = leftMap.find(key);
+        if (it == leftMap.end())
+            return false;
+        rightMap.erase(it->second);
+        leftMap.erase(it);
+        return true;
+    }
+
+    // 根据值删除映射
+    bool deleteByValue(const V &value) {
+        auto it = rightMap.find(value);
+        if (it == rightMap.end())
+            return false;
+        leftMap.erase(it->second);
+        rightMap.erase(it);
+        return true;
+    }
+
+    // 清空所有映射
+    void clear() {
+        leftMap.clear();
+        rightMap.clear();
+    }
+};
+
 #endif // JEMOC_STREAM_TEST_UTILS_H

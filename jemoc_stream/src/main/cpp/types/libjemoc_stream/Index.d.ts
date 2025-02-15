@@ -12,7 +12,32 @@ export interface DeflateStreamOption {
   compressionLevel?: number;
 }
 
+export interface BufferPoolStats {
+  total: number
+  used: number
+}
+
+export abstract class BufferPool {
+  abstract acquire(size: number): ArrayBuffer
+
+  abstract release(buffer: ArrayBuffer): void
+
+  get stats(): BufferPoolStats
+
+  protected updateStats(acquiring: boolean): void
+}
+
+export class LruBufferPool extends BufferPool {
+  constructor(maxSize: number)
+
+  acquire(size: number): ArrayBuffer;
+
+  release(buffer: ArrayBuffer): void;
+}
+
 export interface IStream {
+
+
   get canRead(): boolean;
 
   get canWrite(): boolean;
@@ -363,4 +388,6 @@ export class MemfdStream implements IStream {
   toArrayBuffer(): ArrayBuffer;
 
   get fd(): number;
+
+  sendFile(fd: number): void;
 }

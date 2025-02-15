@@ -5,6 +5,7 @@
 // please include "napi/native_api.h".
 
 #include "stream/MemfdStream.h"
+#include <sys/sendfile.h>
 #include "IStream.h"
 #include <sys/mman.h>
 #include <fcntl.h>
@@ -13,15 +14,22 @@
 #include <cstring>
 #include <cstdio>
 #include <stdexcept>
+#include <sys/stat.h>
 
 std::string MemfdStream::ClassName = "MemfdStream";
 napi_ref MemfdStream::cons = nullptr;
 
 MemfdStream::MemfdStream() : m_fd(-1) {
     // 创建内存中的匿名文件，设置 MFD_CLOEXEC 参数
-    m_fd = memfd_create("memfd_stream", MFD_CLOEXEC);
+    // 生成唯一共享内存名称
+    static int counter = 0;
+    char shm_name[256];
+    snprintf(shm_name, sizeof(shm_name), "/jemoc_memfd_%d_%ld_%d", getpid(), time(nullptr), counter++);
+
+    // 使用shm_open创建共享内存对象
+    m_fd = shm_open(shm_name, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0644);
     if (m_fd < 0) {
-        throw std::runtime_error(std::string("memfd_create failed: ") + std::strerror(errno));
+        throw std::runtime_error(std::string("shm_open failed: ") + std::strerror(errno));
     }
     m_canRead = true;
     m_canWrite = true;
@@ -36,9 +44,15 @@ MemfdStream::MemfdStream() : m_fd(-1) {
 
 MemfdStream::MemfdStream(const void *initialBuffer, size_t bufferSize) : m_fd(-1) {
     // 创建内存中的匿名文件
-    m_fd = memfd_create("memfd_stream", MFD_CLOEXEC);
+    // 生成唯一共享内存名称
+    static int counter = 0;
+    char shm_name[256];
+    snprintf(shm_name, sizeof(shm_name), "/jemoc_memfd_%d_%ld_%d", getpid(), time(nullptr), counter++);
+
+    // 使用shm_open创建共享内存对象
+    m_fd = shm_open(shm_name, O_RDWR | O_CREAT | O_EXCL | O_CLOEXEC, 0644);
     if (m_fd < 0) {
-        throw std::runtime_error(std::string("memfd_create failed: ") + std::strerror(errno));
+        throw std::runtime_error(std::string("shm_open failed: ") + std::strerror(errno));
     }
     m_canRead = true;
     m_canWrite = true;
@@ -163,6 +177,27 @@ void MemfdStream::setLength(long length) {
     }
 }
 
+void MemfdStream::sendFile(const int &fd) {
+    // 通过 fstat 获取源文件大小
+    struct stat st;
+    if (fstat(fd, &st) == -1) {
+        throw std::runtime_error(std::string("fstat failed: ") + std::strerror(errno));
+    }
+    off_t file_size = st.st_size;
+    off_t offset = 0;
+    ssize_t totalSent = 0;
+
+    // 使用 sendfile 将数据拷贝到目标 fd
+    while (offset < file_size) {
+        ssize_t sent = sendfile(fd, m_fd, &offset, file_size - offset);
+        if (sent <= 0) {
+            throw std::runtime_error(std::string("sendfile failed: ") + std::strerror(errno));
+        }
+        totalSent += sent;
+    }
+}
+
+
 napi_value MemfdStream::JSConstructor(napi_env env, napi_callback_info info) {
     GET_JS_INFO_WITHOUT_STREAM(1)
 
@@ -226,15 +261,39 @@ napi_value MemfdStream::JSGetFd(napi_env env, napi_callback_info info) {
     GET_JS_INFO(0)
     napi_value result = nullptr;
     int fd = static_cast<MemfdStream *>(stream)->getFd();
+
     NAPI_CALL(env, napi_create_int32(env, fd, &result));
     return result;
 }
+
+napi_value MemfdStream::JSSendFile(napi_env env, napi_callback_info info) {
+    GET_JS_INFO(1)
+    napi_valuetype type;
+    NAPI_CALL(env, napi_typeof(env, argv[0], &type))
+    int fd = 0;
+
+    if (type == napi_number) {
+        NAPI_CALL(env, napi_get_value_int32(env, argv[0], &fd))
+    } else {
+        napi_throw_type_error(env, tagName, "get fd failed");
+        return nullptr;
+    }
+
+    try {
+        static_cast<MemfdStream *>(stream)->sendFile(fd);
+    } catch (const std::exception &e) {
+        napi_throw_error(env, tagName, e.what());
+    }
+    return nullptr;
+}
+
 
 void MemfdStream::Export(napi_env env, napi_value exports) {
     napi_property_descriptor desc[] = {
         DEFINE_NAPI_ISTREAM_PROPERTY((void *)ClassName.c_str()),
         DEFINE_NAPI_FUNCTION("fd", nullptr, JSGetFd, nullptr, nullptr),
         DEFINE_NAPI_FUNCTION("toArrayBuffer", JSToArrayBuffer, nullptr, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("sendFile", JSSendFile, nullptr, nullptr, nullptr)
     };
     napi_value napi_cons = nullptr;
     napi_define_class(env, ClassName.c_str(), NAPI_AUTO_LENGTH, JSConstructor, nullptr, sizeof(desc) / sizeof(desc[0]),

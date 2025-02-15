@@ -166,6 +166,26 @@ declare namespace base {
   function createFSStream(stream: IStream): fileIo.Stream;
 
   /**
+   * 创建分块迭代器
+   * @param stream
+   * @returns
+   */
+  function createStreamChunk(stream: IStream): ChunkIterator;
+
+  /**
+   * 分块迭代器实现
+   * @param stream
+   * @returns
+   */
+  class ChunkIterator implements AsyncIterable<Uint8Array>, Iterable<Uint8Array> {
+    constructor(stream: IStream, chunkSize?: number)
+
+    [Symbol.asyncIterator](): AsyncIterator<Uint8Array, any, undefined>;
+
+    [Symbol.iterator](): Iterator<Uint8Array, any, undefined>;
+  }
+
+  /**
    * 文件流，适应IStream方式
    */
   class FileStream implements IStream {
@@ -354,8 +374,20 @@ declare namespace base {
      */
     toArrayBuffer(): ArrayBuffer;
 
+    /**
+     * 获取文件描述符
+     * @returns
+     */
     get fd(): number;
+
+    /**
+     * 将数据保存到fd
+     * @param fd
+     */
+    sendFile(fd: number): void;
   }
+
+
 }
 
 declare namespace compression {
@@ -815,4 +847,61 @@ declare namespace compression {
      */
     get compressedSize(): number
   }
+}
+
+/**
+ * BufferPool模块
+ */
+declare namespace bufferpool {
+  export interface BufferPoolStats {
+    total: number
+    used: number
+  }
+
+  export abstract class BufferPool {
+    abstract acquire(size: number): ArrayBuffer
+
+    abstract release(buffer: ArrayBuffer): void
+
+    get stats(): BufferPoolStats
+
+    protected updateStats(acquiring: boolean): void
+  }
+
+  /**
+   * LRU
+   */
+  export class LruBufferPool extends BufferPool {
+    constructor(maxSize: number)
+
+    acquire(size: number): ArrayBuffer;
+
+    release(buffer: ArrayBuffer): void;
+  }
+}
+
+/**
+ * 用于桥接@jemoc/stream与官方stream工具
+ */
+declare namespace streamUtils {
+  /**
+   * 将可读IStream转换成stream.Readable
+   * @param stream
+   * @returns
+   */
+  export function streamToReadable(stream: base.IStream): stream.Readable
+
+  /**
+   * 将可写流转换成stream.Writable
+   * @param stream
+   * @returns
+   */
+  export function streamToWriteable(stream: base.IStream): stream.Writable
+
+  /**
+   * 用于多路可写流，将可读流同时写入多个可写流
+   * @param stream
+   * @returns
+   */
+  export function createMultiWritable(...stream: base.IStream[]): stream.Writable
 }

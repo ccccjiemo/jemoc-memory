@@ -1,6 +1,7 @@
-import { base, compression } from '@jemoc/stream';
+import { base, compression, bufferpool } from '@jemoc/stream';
 import { fileIo, fileUri } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
+import image from '@ohos.multimedia.image';
 
 @Entry
 @Component
@@ -9,6 +10,29 @@ struct Index {
 
   build() {
     Column() {
+      Button('test fd').onClick(async (event: ClickEvent) => {
+        const cache = getContext(this).cacheDir;
+        const fd = await getContext(this).resourceManager.getRawFd('0002.jpg');
+        const fs = new base.FileStream(fd);
+        const ms = new base.MemfdStream();
+        await fs.copyToAsync(ms);
+
+        const source = image.createImageSource(ms.fd);
+        const pixelMap = await source.createPixelMap();
+
+
+
+        console.log('1')
+
+      })
+      Button('test buffer pool')
+        .onClick(() => {
+          const pool = new bufferpool.LruBufferPool(10);
+          for (let i = 0; i < 1000; i++) {
+            const buffer = pool.acquire(1024);
+            pool.release(buffer);
+          }
+        })
       Button('test deflate')
         .onClick(() => {
           getContext(this).resourceManager.getRawFileContent('lorem_1mb.txt', (err, data) => {

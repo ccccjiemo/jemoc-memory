@@ -1,3 +1,4 @@
+#include "BufferPool.h"
 #include "stream/DeflateStream.h"
 #include "stream/FileStream.h"
 #include "stream/MemfdStream.h"
@@ -19,6 +20,8 @@ static napi_value Init(napi_env env, napi_value exports) {
     ZipArchiveEntry::Export(env, exports);
     Inflater::Export(env, exports);
     Deflater::Export(env, exports);
+    jemoc_stream::BufferPool::Export(env, exports);
+    jemoc_stream::LruBufferPool::Export(env, exports);
     return exports;
 }
 EXTERN_C_END
