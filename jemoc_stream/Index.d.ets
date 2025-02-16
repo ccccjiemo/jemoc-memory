@@ -1,6 +1,7 @@
 import { stream } from "@kit.ArkTS";
 import { fileIo } from "@kit.CoreFileKit";
 import { resourceManager } from "@kit.LocalizationKit";
+import { ChunkIterator } from "./src/main/ets/base/ChunkIterator";
 
 export type BufferLike = ArrayBufferLike | Uint8Array;
 
@@ -172,18 +173,7 @@ declare namespace base {
    */
   function createStreamChunk(stream: IStream): ChunkIterator;
 
-  /**
-   * 分块迭代器实现
-   * @param stream
-   * @returns
-   */
-  class ChunkIterator implements AsyncIterable<Uint8Array>, Iterable<Uint8Array> {
-    constructor(stream: IStream, chunkSize?: number)
 
-    [Symbol.asyncIterator](): AsyncIterator<Uint8Array, any, undefined>;
-
-    [Symbol.iterator](): Iterator<Uint8Array, any, undefined>;
-  }
 
   /**
    * 文件流，适应IStream方式
@@ -331,6 +321,12 @@ declare namespace base {
     toArrayBuffer(): ArrayBuffer;
   }
 
+  export interface SendFileOptions {
+    offset?: number
+    length?: number
+    autoClose?: boolean
+  }
+
   class MemfdStream implements IStream {
     constructor(buffer?: BufferLike)
 
@@ -384,7 +380,13 @@ declare namespace base {
      * 将数据保存到fd
      * @param fd
      */
-    sendFile(fd: number): void;
+    sendFile(fd: number, options?: SendFileOptions): boolean
+
+    sendFile(path: string, mode: number,  options?: SendFileOptions): boolean;
+
+    sendFileAsync(fd: number, options?: SendFileOptions): Promise<boolean>
+
+    sendFileAsync(path: string, mode: number,  options?: SendFileOptions): Promise<boolean>
   }
 
 

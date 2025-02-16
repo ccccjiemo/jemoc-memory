@@ -20,7 +20,7 @@ struct Index {
         const source = image.createImageSource(ms.fd);
         const pixelMap = await source.createPixelMap();
 
-
+        const result = await ms.sendFileAsync(cache + '/test.jpg', fileIo.OpenMode.CREATE | fileIo.OpenMode.WRITE_ONLY);
 
         console.log('1')
 

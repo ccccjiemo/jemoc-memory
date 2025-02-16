@@ -177,24 +177,24 @@ void MemfdStream::setLength(long length) {
     }
 }
 
-void MemfdStream::sendFile(const int &fd) {
+bool MemfdStream::sendFile(const int &fd, long offset, long length) {
     // 通过 fstat 获取源文件大小
     struct stat st;
     if (fstat(fd, &st) == -1) {
-        throw std::runtime_error(std::string("fstat failed: ") + std::strerror(errno));
+        OH_LOG_ERROR(LOG_APP, "fstat failed: %s", std::strerror(errno));
+        return false;
     }
-    off_t file_size = st.st_size;
-    off_t offset = 0;
-    ssize_t totalSent = 0;
+
+    off_t offset_ = std::max(0l, offset);
+    long length_ = std::max(0l, std::min(m_length - offset_, length));
 
     // 使用 sendfile 将数据拷贝到目标 fd
-    while (offset < file_size) {
-        ssize_t sent = sendfile(fd, m_fd, &offset, file_size - offset);
-        if (sent <= 0) {
-            throw std::runtime_error(std::string("sendfile failed: ") + std::strerror(errno));
-        }
-        totalSent += sent;
+    ssize_t sent = sendfile(fd, m_fd, &offset_, length_);
+    if (sent <= 0) {
+        OH_LOG_ERROR(LOG_APP, "sendfile failed, errno: %d", errno);
+        return false;
     }
+    return true;
 }
 
 
@@ -267,24 +267,211 @@ napi_value MemfdStream::JSGetFd(napi_env env, napi_callback_info info) {
 }
 
 napi_value MemfdStream::JSSendFile(napi_env env, napi_callback_info info) {
-    GET_JS_INFO(1)
-    napi_valuetype type;
-    NAPI_CALL(env, napi_typeof(env, argv[0], &type))
-    int fd = 0;
+//     GET_JS_INFO(3)
+//     napi_valuetype type;
+//     int fd = -1;
+//     napi_value result;
+//     bool autoClose = false;
+//     long offset = 0;
+//     long length = stream->getLength();
+//     int optionsIndex = 0;
+//
+//
+//     NAPI_CALL(env, napi_typeof(env, argv[0], &type))
+//     if (type == napi_number) {
+//         NAPI_CALL(env, napi_get_value_int32(env, argv[0], &fd))
+//         optionsIndex = 1;
+//     } else if (type == napi_string) {
+//         NAPI_CALL(env, napi_typeof(env, argv[1], &type))
+//         if (type != napi_number) {
+//             napi_throw_type_error(env, "MemfdStream", "mode must be number");
+//             return nullptr;
+//         }
+//         autoClose = true;
+//         int openMode = 0;
+//         NAPI_CALL(env, napi_get_value_int32(env, argv[1], &openMode))
+//
+//         size_t bufsize = 0;
+//         NAPI_CALL(env, napi_get_value_string_utf8(env, argv[0], nullptr, 0, &bufsize))
+//         std::unique_ptr<char[]> buffer(new char[bufsize + 1]{'\0'});
+//         NAPI_CALL(env, napi_get_value_string_utf8(env, argv[0], buffer.get(), bufsize + 1, &bufsize))
+//         fd = open(buffer.get(), openMode, 0644);
+//
+//         optionsIndex = 2;
+//     } else {
+//         napi_throw_type_error(env, ClassName.c_str(), "invalid parameter type");
+//         return nullptr;
+//     }
+//
+//     if (fd == -1) {
+//         OH_LOG_ERROR(LOG_APP, "%s", "fd error, fd = -1, errno:%d", errno);
+//         NAPI_CALL(env, napi_get_boolean(env, false, &result))
+//         return result;
+//     }
+//
+//
+//     NAPI_CALL(env, napi_typeof(env, argv[optionsIndex], &type))
+//     if (type == napi_object) {
+//         napi_value js_offset;
+//         napi_value js_length;
+//         napi_value js_auto_close;
+//         NAPI_CALL(env, napi_get_named_property(env, argv[1], "offset", &js_offset))
+//         NAPI_CALL(env, napi_get_named_property(env, argv[1], "length", &js_length))
+//         NAPI_CALL(env, napi_get_named_property(env, argv[1], "autoClose", &js_auto_close))
+//         NAPI_CALL(env, napi_typeof(env, js_offset, &type))
+//         if (type == napi_number) {
+//             NAPI_CALL(env, napi_get_value_int64(env, js_offset, &offset))
+//         }
+//
+//         NAPI_CALL(env, napi_typeof(env, js_length, &type))
+//         if (type == napi_number) {
+//             NAPI_CALL(env, napi_get_value_int64(env, js_length, &length))
+//         }
+//         if (optionsIndex == 1) {
+//             NAPI_CALL(env, napi_typeof(env, js_auto_close, &type))
+//             if (type == napi_boolean) {
+//                 NAPI_CALL(env, napi_get_value_bool(env, js_auto_close, &autoClose));
+//             }
+//         }
+//     }
+//
+//     try {
+//         static_cast<MemfdStream *>(stream)->sendFile(fd, offset, length);
+//         NAPI_CALL(env, napi_get_boolean(env, true, &result))
+//     } catch (const std::exception &e) {
+//         OH_LOG_ERROR(LOG_APP, "%s", e.what());
+//         NAPI_CALL(env, napi_get_boolean(env, false, &result))
+//     }
+//
+//     if (autoClose) {
+//         ::close(fd);
+//     }
+//
+//     return result;
 
+    int fd = -1;
+    bool autoClose = false;
+    long offset = 0;
+    long length = 0;
+    MemfdStream *stream = nullptr;
+
+    initSendFile(env, info, fd, offset, length, autoClose, &stream);
+
+    bool val = stream->sendFile(fd, offset, length);
+
+    if (autoClose) {
+        ::close(fd);
+    }
+
+    napi_value result = nullptr;
+
+    NAPI_CALL(env, napi_get_boolean(env, val, &result))
+    return result;
+}
+
+void MemfdStream::initSendFile(napi_env env, napi_callback_info info, int &fd, long &offset, long &length,
+                               bool &autoClose, MemfdStream **fdStream) {
+    GET_JS_INFO(3)
+    napi_valuetype type;
+    fd = -1;
+    napi_value result;
+    autoClose = false;
+    offset = 0;
+    length = stream->getLength();
+    int optionsIndex = 0;
+
+    *fdStream = static_cast<MemfdStream *>(stream);
+
+
+    NAPI_CALL(env, napi_typeof(env, argv[0], &type))
     if (type == napi_number) {
         NAPI_CALL(env, napi_get_value_int32(env, argv[0], &fd))
+        optionsIndex = 1;
+    } else if (type == napi_string) {
+        NAPI_CALL(env, napi_typeof(env, argv[1], &type))
+        if (type != napi_number) {
+            napi_throw_type_error(env, "MemfdStream", "mode must be number");
+        }
+        autoClose = true;
+        int openMode = 0;
+        NAPI_CALL(env, napi_get_value_int32(env, argv[1], &openMode))
+
+        size_t bufsize = 0;
+        NAPI_CALL(env, napi_get_value_string_utf8(env, argv[0], nullptr, 0, &bufsize))
+        std::unique_ptr<char[]> buffer(new char[bufsize + 1]{'\0'});
+        NAPI_CALL(env, napi_get_value_string_utf8(env, argv[0], buffer.get(), bufsize + 1, &bufsize))
+        fd = open(buffer.get(), openMode, 0644);
+
+        optionsIndex = 2;
     } else {
-        napi_throw_type_error(env, tagName, "get fd failed");
-        return nullptr;
+        napi_throw_type_error(env, ClassName.c_str(), "invalid parameter type");
     }
 
-    try {
-        static_cast<MemfdStream *>(stream)->sendFile(fd);
-    } catch (const std::exception &e) {
-        napi_throw_error(env, tagName, e.what());
+    NAPI_CALL(env, napi_typeof(env, argv[optionsIndex], &type))
+    if (type == napi_object) {
+        napi_value js_offset;
+        napi_value js_length;
+        napi_value js_auto_close;
+        NAPI_CALL(env, napi_get_named_property(env, argv[1], "offset", &js_offset))
+        NAPI_CALL(env, napi_get_named_property(env, argv[1], "length", &js_length))
+        NAPI_CALL(env, napi_get_named_property(env, argv[1], "autoClose", &js_auto_close))
+        NAPI_CALL(env, napi_typeof(env, js_offset, &type))
+        if (type == napi_number) {
+            NAPI_CALL(env, napi_get_value_int64(env, js_offset, &offset))
+        }
+
+        NAPI_CALL(env, napi_typeof(env, js_length, &type))
+        if (type == napi_number) {
+            NAPI_CALL(env, napi_get_value_int64(env, js_length, &length))
+        }
+        if (optionsIndex == 1) {
+            NAPI_CALL(env, napi_typeof(env, js_auto_close, &type))
+            if (type == napi_boolean) {
+                NAPI_CALL(env, napi_get_value_bool(env, js_auto_close, &autoClose));
+            }
+        }
     }
-    return nullptr;
+}
+
+napi_value MemfdStream::JSSendFileAsync(napi_env env, napi_callback_info info) {
+    int fd = -1;
+    bool autoClose = false;
+    long offset = 0;
+    long length = 0;
+    MemfdStream *stream = nullptr;
+
+    initSendFile(env, info, fd, offset, length, autoClose, &stream);
+
+    SendFileData *data = new SendFileData{
+        .stream = stream, .fd = fd, .offset = offset, .length = length, .result = false, .autoClose = autoClose};
+    napi_value resourceName = nullptr;
+    NAPI_CALL(env, napi_create_string_utf8(env, "sendFileAsync", NAPI_AUTO_LENGTH, &resourceName))
+    napi_value result = nullptr;
+    NAPI_CALL(env, napi_create_promise(env, &data->deferred, &result))
+    napi_create_async_work(
+        env, nullptr, resourceName,
+        [](napi_env env, void *data) {
+            SendFileData *asyncData = static_cast<SendFileData *>(data);
+            asyncData->result = asyncData->stream->sendFile(asyncData->fd, asyncData->offset, asyncData->length);
+        },
+        [](napi_env env, napi_status status, void *data) {
+            SendFileData *asyncData = static_cast<SendFileData *>(data);
+            napi_value result = nullptr;
+            if (asyncData->autoClose) {
+                ::close(asyncData->fd);
+            }
+            NAPI_CALL(env, napi_get_boolean(env, asyncData->result, &result))
+            if (status == napi_ok) {
+                NAPI_CALL(env, napi_resolve_deferred(env, asyncData->deferred, result))
+            } else {
+                NAPI_CALL(env, napi_reject_deferred(env, asyncData->deferred, nullptr))
+            }
+            NAPI_CALL(env, napi_delete_async_work(env, asyncData->work))
+        },
+        data, &data->work);
+
+    NAPI_CALL(env, napi_queue_async_work(env, data->work))
+    return result;
 }
 
 
@@ -293,7 +480,8 @@ void MemfdStream::Export(napi_env env, napi_value exports) {
         DEFINE_NAPI_ISTREAM_PROPERTY((void *)ClassName.c_str()),
         DEFINE_NAPI_FUNCTION("fd", nullptr, JSGetFd, nullptr, nullptr),
         DEFINE_NAPI_FUNCTION("toArrayBuffer", JSToArrayBuffer, nullptr, nullptr, nullptr),
-        DEFINE_NAPI_FUNCTION("sendFile", JSSendFile, nullptr, nullptr, nullptr)
+        DEFINE_NAPI_FUNCTION("sendFile", JSSendFile, nullptr, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("sendFileAsync", JSSendFileAsync, nullptr, nullptr, nullptr),
     };
     napi_value napi_cons = nullptr;
     napi_define_class(env, ClassName.c_str(), NAPI_AUTO_LENGTH, JSConstructor, nullptr, sizeof(desc) / sizeof(desc[0]),

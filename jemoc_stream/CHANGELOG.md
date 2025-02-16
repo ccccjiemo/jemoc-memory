@@ -1,3 +1,10 @@
+## [1.1.1] - 2025-02-16
+
+- 修复MemfdStream的sendFile问题
+- MemfdStream增加sendFileAsync方法,新增传入文件路径支持
+
+---
+
 ## [1.1.0] - 2025-02-15
 
 - 修复MemfdStream创建的fd无法用于image.createImageSource问题

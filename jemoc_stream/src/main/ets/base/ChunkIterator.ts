@@ -2,6 +2,12 @@ import { IStream } from './IStream'
 
 const chunkSize: number = 1024 * 8;
 
+/**
+ * 分块迭代器实现
+ * @param stream
+ * @returns
+ */
+
 export class ChunkIterator implements AsyncIterable<Uint8Array>, Iterable<Uint8Array> {
   private baseStream: IStream;
   private chunkSize: number;

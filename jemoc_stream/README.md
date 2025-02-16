@@ -141,11 +141,24 @@ CREATE = 0x08 // 文件不存在时创建
 **特有方法：**
 
 - `toArrayBuffer(): ArrayBuffer`  返回内存流数据（不修改指针位置）
-- `sendFile(fd: number): void` 将数据通过文件描述符发送到文件
+- `sendFile(fd: number, options?: SendFileOptions): boolean` 将数据通过文件描述符发送到文件
+- `sendFile(path: string, mode: number,  options?: SendFileOptions): boolean` 将数据发送到指定的文件,打开模式，使用官方的fileIO.openMode
+- `sendFileAsync(fd: number, options?: SendFileOptions): Promise<boolean>` sendFile异步方法
+- `sendFileAsync(path: string, mode: number,  options?: SendFileOptions): Promise<boolean>` sendFile异步方法
+
 
 **特有属性：**
 
 - `get fd(): number`  获取文件描述符fd
+
+***SendFileOptions***
+```typescript
+interface SendFileOptions {
+  offset?: number //MemfdStream指针偏移， 默认0
+  length?: number //发送数据长度，默认内存流大小减去offset
+  autoClose?: boolean //传入fd时生效，发送完数据是否自动关闭fd
+}
+```
 
 ### createFSStream 方法
 

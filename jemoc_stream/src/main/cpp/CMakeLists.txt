@@ -23,4 +23,4 @@ set_target_properties(zlib-ng PROPERTIES
     INTERFACE_INCLUDE_DIRECTORIES ${NATIVERENDER_ROOT_PATH}/zlib-ng/include)
 
 add_library(jemoc_stream SHARED napi_init.cpp ${STREAM_FILE} ${DEFLATE_FILE} ${ZIP_FILE} ${BUFFER_POOL})
-target_link_libraries(jemoc_stream PUBLIC libace_napi.z.so zlib-ng)
+target_link_libraries(jemoc_stream PUBLIC libace_napi.z.so zlib-ng libhilog_ndk.z.so)

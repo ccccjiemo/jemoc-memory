@@ -14,9 +14,15 @@
 #include <chrono>
 #include <ctime>
 #include <unordered_map>
+#include <hilog/log.h>
+
+
 
 typedef unsigned char byte;
 class IStream;
+
+#define LOG_LIB_DOMAIN 0x3000
+#define LOG_LIB_TAG "@jemoc/stream"
 
 #define NAPI_CALL(env, func) NAPI_CALL_BASE(env, func, __LINE__)
 

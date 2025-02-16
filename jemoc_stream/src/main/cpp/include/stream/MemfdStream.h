@@ -12,6 +12,17 @@
 
 // 基于 memfd_create 的内存流实现，支持截断流长度，并允许构造时传入初始缓冲区数据
 class MemfdStream : public IStream {
+    struct SendFileData {
+        MemfdStream *stream;
+        int fd;
+        long offset;
+        long length;
+        bool result;
+        bool autoClose;
+        napi_async_work work;
+        napi_deferred deferred;
+    };
+
 public:
     MemfdStream();
     MemfdStream(const void *initialBuffer, size_t bufferSize);
@@ -23,7 +34,7 @@ public:
     void flush() override;
     void close() override;
     void setLength(long length) override;
-    void sendFile(const int& fd);
+    bool sendFile(const int &fd, long offset, long length);
 
     // 获取 memfd 的文件描述符
     int getFd() const;
@@ -37,6 +48,9 @@ public:
     static void Export(napi_env env, napi_value exports);
     static napi_value JSGetFd(napi_env env, napi_callback_info info);
     static napi_value JSSendFile(napi_env env, napi_callback_info info);
+    static napi_value JSSendFileAsync(napi_env env, napi_callback_info info);
+    static void initSendFile(napi_env env, napi_callback_info info, int &fd, long &offset, long &length,
+                             bool &autoClose, MemfdStream **fdStream);
     napi_value readAllFromFd(napi_env env);
 
 private:

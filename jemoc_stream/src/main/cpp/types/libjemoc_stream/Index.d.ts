@@ -348,6 +348,12 @@ export class Inflater {
   get isGzipInput(): boolean
 }
 
+export interface SendFileOptions {
+  offset?: number
+  length?: number
+  autoClose?: boolean
+}
+
 export class MemfdStream implements IStream {
   constrructor(buffer: BufferLike)
 
@@ -389,5 +395,11 @@ export class MemfdStream implements IStream {
 
   get fd(): number;
 
-  sendFile(fd: number): void;
+  sendFile(fd: number, options?: SendFileOptions): boolean
+
+  sendFile(path: string, mode: number,  options?: SendFileOptions): boolean
+
+  sendFileAsync(fd: number, options?: SendFileOptions): Promise<boolean>
+
+  sendFileAsync(path: string, mode: number,  options?: SendFileOptions): Promise<boolean>
 }

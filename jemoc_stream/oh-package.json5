@@ -1,6 +1,6 @@
 {
   "name": "@jemoc/stream",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "参考.net Stream方法实现,并提供Deflate方法.",
   "keywords": [
     "deflate",
@@ -10,7 +10,7 @@
     "zip"
   ],
   "main": "Index.ets",
-  "types": "Index.d.ts",
+  "types": "Index.d.ets",
   "homepage": "https://gitee.com/jiemoccc/jemoc-memory.git",
   "repository": "https://gitee.com/jiemoccc/jemoc-memory.git",
   "author": "ccccjiemo",
