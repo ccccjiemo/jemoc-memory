@@ -2,17 +2,6 @@
 
 ---
 方法参考.net Stream。zlib-ng提供Inflate、Deflate支持。
-
-实现MemoryStream，自动扩容内存流
-
-实现FileStream,适应该库方法
-
-实现DeflateStream完成deflate数据压缩解压缩流
-
-实现ZipArchive完成zip的压缩和解压
-
-Deflator、Inflator可以直接进行deflate压缩和inflate解压和创建鸿蒙stream.Transform转换流
-
 gzip加解压缩通过设置windowBits实现。所有方法windowBits默认-15
 
 ### 如何安装
@@ -38,11 +27,13 @@ ohpm install @jemoc/stream
     - [createFSStream 方法](#createfsstream-方法)
     - [createStreamChunk 方法](#createstreamchunk-方法)
 - [流工具 (命名空间 streamUtils)](#流工具-namespace-streamutils)
-  - [streamToReadable 方法](#streamtoreadable-方法)
-  - [streamToWriteable 方法](#streamtoreadable-方法)
-  - [createMultiWritable 方法](#createmultiwritable)
+    - [streamToReadable 方法](#streamtoreadable-方法)
+    - [streamToWriteable 方法](#streamtoreadable-方法)
+    - [createMultiWritable 方法](#createmultiwritable)
 - [压缩流 (命名空间 compression)](#压缩流-namespace-compression)
     - [DeflateStream 类](#deflatestream-类)
+    - [BrotliStream 类](#brotlistream)
+    - [BrotliUtils 类](#brotliutils)
     - [Deflator 类](#deflator-类)
     - [Inflator 类](#inflator-类)
     - [ZipArchive 类](#ziparchive-类)
@@ -107,6 +98,15 @@ CREATE = 0x08 // 文件不存在时创建
 }
 ```
 
+### ToArrayBufferOptions
+
+```typescript
+interface ToArrayBufferOptions {
+offset?: number;
+length?: number;
+}
+```
+
 ### FileStream 类
 
 文件流实现，继承自 IStream
@@ -128,11 +128,14 @@ CREATE = 0x08 // 文件不存在时创建
 
 **特有方法：**
 
-- `toArrayBuffer(): ArrayBuffer`  返回内存流数据（不修改指针位置）
+- `toArrayBuffer(options?: ToArrayBufferOptions): ArrayBuffer`  返回内存流数据（不修改指针位置）
 
 ### MemfdStream 类
 
 内存流实现，继承自 IStream,此版本用于创建基于内存的文件描述符，使用场景比如文件数据在内存，使用image工具创建imageSource时传入fd用于解码;使用官方rcp发送数据时，通过fd创建fs.Stream等。
+**
+*通常情况下，从压缩流解密出原始文件或从网络接收文件数据，需要保存到本地后再通过官方提供的读取工具使用。这种流程下，数据要经过解码/网络等待->
+写入文件->读取***
 
 **构造函数：**
 
@@ -140,23 +143,23 @@ CREATE = 0x08 // 文件不存在时创建
 
 **特有方法：**
 
-- `toArrayBuffer(): ArrayBuffer`  返回内存流数据（不修改指针位置）
+- `toArrayBuffer(options?: ToArrayBufferOptions): ArrayBuffer`  返回内存流数据（不修改指针位置）
 - `sendFile(fd: number, options?: SendFileOptions): boolean` 将数据通过文件描述符发送到文件
-- `sendFile(path: string, mode: number,  options?: SendFileOptions): boolean` 将数据发送到指定的文件,打开模式，使用官方的fileIO.openMode
+- `sendFile(path: string, mode: number, options?: SendFileOptions): boolean` 将数据发送到指定的文件,打开模式，使用官方的fileIO.openMode
 - `sendFileAsync(fd: number, options?: SendFileOptions): Promise<boolean>` sendFile异步方法
-- `sendFileAsync(path: string, mode: number,  options?: SendFileOptions): Promise<boolean>` sendFile异步方法
-
+- `sendFileAsync(path: string, mode: number, options?: SendFileOptions): Promise<boolean>` sendFile异步方法
 
 **特有属性：**
 
 - `get fd(): number`  获取文件描述符fd
 
 ***SendFileOptions***
+
 ```typescript
 interface SendFileOptions {
-  offset?: number //MemfdStream指针偏移， 默认0
-  length?: number //发送数据长度，默认内存流大小减去offset
-  autoClose?: boolean //传入fd时生效，发送完数据是否自动关闭fd
+offset?: number //MemfdStream指针偏移， 默认0
+length?: number //发送数据长度，默认内存流大小减去offset
+autoClose?: boolean //传入fd时生效，发送完数据是否自动关闭fd
 }
 ```
 
@@ -172,6 +175,7 @@ interface SendFileOptions {
 ## 流工具 (namespace streamUtils)
 
 ---
+
 ### streamToReadable
 
 `function streamToReadable(stream: base.IStream): stream.Readable` 将可写流转换成stream.Writable
@@ -183,7 +187,6 @@ interface SendFileOptions {
 ### createMultiWritable
 
 `function createMultiWritable(...stream: base.IStream[]): stream.Writable` 用于多路可写流，将可读流同时写入多个可写流
-
 
 ## 压缩流 (namespace compression)
 
@@ -274,36 +277,91 @@ ZIP 压缩包操作
 - `get lastModifier(): Date`
 - `get crc32(): number`
 
+## BrotliStream
+
+***Brotli压缩/解压流，继承IStream所有方法***
+
+**构造函数**
+
+- `new BrotliStream(stream:base.IStream,mode:BrotliStreamMode, option ? : BrotliStreamOptions)`
+
+**参数说明**
+
+***BrotliStreamMode***
+
+```typescript
+enum BrotliStreamMode {
+Compress,
+Decompress
+}
+```
+
+***BrotliStreamOptions***
+
+```typescript
+interface BrotliStreamOptions {
+quality?: number; //压缩等级
+lgWin?: number; //压缩窗口
+mode?: number; //压缩模式
+leaveOpen?: boolean; //关闭流时，是否保持构造函数中的stream是否保持打开
+bufferSize?: number; //缓冲区大小 默认8k
+}
+```
+
+## BrotliUtils
+
+Brotli工具类
+
+**方法**
+
+- `function compress(buffer: BufferLike | string, config?: BrotliConfig): ArrayBuffer | undefined`
+
+- `function decompress(buffer: BufferLike | string): ArrayBuffer | undefined`
+
+- `function compressAsync(buffer: BufferLike | string, config?: BrotliConfig): Promise<ArrayBuffer>`
+
+- `function decompressAsync(buffer: BufferLike | string): Promise<ArrayBuffer>`
+
 ## 缓冲池 (namespace bufferpool) 实验阶段
 
 ---
+
 ### BufferPool 抽象类
+
 ```typescript
 abstract class BufferPool {
   abstract acquire(size: number): ArrayBuffer
+
   abstract release(buffer: ArrayBuffer): void
+
   get stats(): BufferPoolStats
 
   protected updateStats(acquiring: boolean): void
 }
 ```
+
 ***后续将会改变***
+
 ```typescript
 abstract class BufferPool<TStats extends BufferPoolStats> { //通过泛型用于缓冲池返回更多信息，如命中率使用率等
   abstract acquire(size?: number): ArrayBuffer | undefined //size改为可选，用于FixedBufferPool/RingBufferPool支持, 同步接口在创建失败时返回undefined
+
   abstract acquireAsync(size?: number): Promise<ArrayBuffer> //异步接口用于长时间等待缓冲
+
   abstract release(buffer: ArrayBuffer): void
+
   get stats(): TStats
 
   protected updateStats(state: BufferState, size: number): void //用于记录创建、归还、复用、淘汰等信息
 }
 ```
 
-***BufferPoolStats*** 
+***BufferPoolStats***
+
 ```typescript
 interface BufferPoolStats {
-  total: number
-  used: number
+total: number
+used: number
 }
 ```
 
@@ -312,7 +370,9 @@ interface BufferPoolStats {
 - `get stats()` 获取缓冲池状态信息
 
 ### LruBufferPool(后续会改)
+
 ***带LRU淘汰策略的BufferPool***
+
 ```typescript
 class LruBufferPool extends BufferPool {
   constructor(maxSize: number) //最大缓冲池大小
@@ -344,6 +404,7 @@ const data = new TextEncoder().encode("Hello World");
 outFs.write(data);
 outFs.close();
 ```
+
 ### 使用迭代器读取流
 
 ```typescript
@@ -476,6 +537,48 @@ const ms = new base.MemoryStream(10000); //提前预设容量减少扩容次数
 const fs = new base.FileStream("1.txt");
 fs.copyTo(ms);
 const buffer = ms.toArrayBuffer();
+```
+
+### gzip流加解密
+
+***GZip流使用DeflateStream设置windowBits为31实现***
+
+```typescript
+const outputStream = new base.MemoryStream();
+const inputStream = new base.MemoryStream();
+const gzipCompressStream =
+  new compression.DeflateStream(outputStream, compression.DeflateStreamMode.Compress, { windowBits: 31 });
+const gzipDecompressStream =
+  new compression.DeflateStream(inputStream, compression.DeflateStreamMode.Decompress, { windowBits: 31 });
+```
+
+### MemfdStream使用示例
+
+```typescript
+import { fileIO as fs } from "@kit.CoreFileKit";
+
+const zip = new compression.ZipArchive("test.zip");
+const entry = zip.getEntry('test.jpg');
+const stream = entry.open();
+const ms = new base.MemfdStream();
+stream.copyTo(ms);
+const imageSource = image.createImageSource(ms.fd); //通过MemfdStream内部fd创建image实例
+const pixelMap = imageSource.createPixelMapSync();
+ms.sendFile(getContext(this).cacheDir + '/test.jpg', fs.OpenMode.CREATE | fs.OpenMode.WRITE_ONLY); //直接缓存文件，下次读取时从缓存目录读取
+ms.close();
+```
+
+### Brotli使用示例
+
+```typescript
+import { compression, base } from '@jemoc/stream'
+
+const ms = new base.MemoryStream();
+const bs = new compression.BrotliStream(ms, compression.BrotliStreamMode.Compress); //使用方法与DeflateStream类似，不多做介绍
+
+const compressData = compression.BrotliUtils.compress("hello world"); //使用工具类进行brotli压缩
+const decompressData = compression.BrotliUtils.decompress(compressData); //使用工具类进行brotli解压
+
 ```
 
 ## 如果使用遇到问题

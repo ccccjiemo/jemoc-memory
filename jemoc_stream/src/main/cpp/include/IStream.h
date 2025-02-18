@@ -28,6 +28,31 @@ struct AsyncWorkData {
     napi_async_work work;
 };
 
+static void getToArrayBufferOptions(napi_env env, napi_value value, long *offset, long *length) {
+    napi_valuetype type;
+    NAPI_CALL(env, napi_typeof(env, value, &type))
+    if (type != napi_object)
+        return;
+
+    napi_value jsVal;
+    NAPI_CALL(env, napi_get_named_property(env, value, "offset", &jsVal))
+    NAPI_CALL(env, napi_typeof(env, jsVal, &type))
+    if (napi_number == type) {
+        long len = 0;
+        NAPI_CALL(env, napi_get_value_int64(env, jsVal, &len))
+        *offset = std::max(0l, std::min(*length, len));
+        *length = *length - *offset;
+    }
+
+    NAPI_CALL(env, napi_get_named_property(env, value, "length", &jsVal))
+    NAPI_CALL(env, napi_typeof(env, jsVal, &type))
+    if (napi_number == type) {
+        long len = 0;
+        NAPI_CALL(env, napi_get_value_int64(env, jsVal, &len))
+        *length = std::max(0l, std::min(*length, len));
+    }
+}
+
 #define GET_JS_INFO_WITHOUT_CHECK(count)                                                                               \
     GET_JS_INFO_WITHOUT_STREAM(count)                                                                                  \
     IStream *stream = getStream(env, _this);
@@ -152,6 +177,10 @@ public:
     static napi_value JSGetIsClosed(napi_env env, napi_callback_info info);
     static napi_value JSCreateInterface(napi_env env, IStream *stream);
 
+    static void Export(napi_env env, napi_value exports);
+    static void Extends(napi_env env, napi_value constructor);
+    static std::string ClassName;
+    static napi_value cons;
 
 public:
     IStream()
@@ -181,6 +210,7 @@ protected:
     long m_position;
     long m_length;
     bool m_closed;
+    std::mutex mutex_;
 };
 
 #endif // JEMOC_STREAM_TEST_ISTREAM_H

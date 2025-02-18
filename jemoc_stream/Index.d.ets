@@ -8,6 +8,14 @@ export type BufferLike = ArrayBufferLike | Uint8Array;
 declare namespace base {
 
   /**
+   * @since 1.1.2
+   */
+  interface ToArrayBufferOptions {
+    offset?: number;
+    length?: number;
+  }
+
+  /**
    * Stream基类，所有Stream继承自IStream,不要混用同步和异步方法，异常均会抛出错误
    */
   interface IStream {
@@ -46,6 +54,8 @@ declare namespace base {
      * @param value
      */
     set length(value: number);
+
+    get isClosed(): boolean;
 
     /**
      * 拷贝从指针位置到流末端的数据到指定流（Stream)中.并推动指针到末端
@@ -174,7 +184,6 @@ declare namespace base {
   function createStreamChunk(stream: IStream): ChunkIterator;
 
 
-
   /**
    * 文件流，适应IStream方式
    */
@@ -189,6 +198,8 @@ declare namespace base {
     constructor(fd: number, mode?: FileMode)
 
     constructor(rawFile: resourceManager.RawFileDescriptor)
+
+    get isClosed(): boolean;
 
     /**
      * 当追加模式，这个是可能是false
@@ -292,6 +303,8 @@ declare namespace base {
 
     set length(value: number);
 
+    get isClosed(): boolean;
+
     copyTo(stream: IStream, bufferSize?: number | undefined): void;
 
     copyToAsync(stream: IStream, bufferSize?: number | undefined): Promise<void>;
@@ -318,7 +331,7 @@ declare namespace base {
      * 返回流中的所有数据，不修改指针位置
      * @returns
      */
-    toArrayBuffer(): ArrayBuffer;
+    toArrayBuffer(options?: ToArrayBufferOptions): ArrayBuffer;
   }
 
   export interface SendFileOptions {
@@ -342,6 +355,8 @@ declare namespace base {
 
     set length(value: number);
 
+    get isClosed(): boolean;
+
     copyTo(stream: IStream, bufferSize?: number | undefined): void;
 
     copyToAsync(stream: IStream, bufferSize?: number | undefined): Promise<void>;
@@ -368,7 +383,7 @@ declare namespace base {
      * 返回流中的所有数据，不修改指针位置
      * @returns
      */
-    toArrayBuffer(): ArrayBuffer;
+    toArrayBuffer(options?: ToArrayBufferOptions): ArrayBuffer;
 
     /**
      * 获取文件描述符
@@ -381,18 +396,104 @@ declare namespace base {
      * @param fd
      */
     sendFile(fd: number, options?: SendFileOptions): boolean
-
-    sendFile(path: string, mode: number,  options?: SendFileOptions): boolean;
+    sendFile(path: string, mode: number, options?: SendFileOptions): boolean;
 
     sendFileAsync(fd: number, options?: SendFileOptions): Promise<boolean>
-
-    sendFileAsync(path: string, mode: number,  options?: SendFileOptions): Promise<boolean>
+    sendFileAsync(path: string, mode: number, options?: SendFileOptions): Promise<boolean>
   }
 
 
 }
 
 declare namespace compression {
+
+  /**
+   * @since 1.1.2
+   */
+  export enum BrotliStreamMode {
+    Compress,
+    Decompress
+  }
+
+  /**
+   * @since 1.1.2
+   */
+  export interface BrotliStreamOptions {
+    quality?: number;
+    lgWin?: number;
+    mode?: number;
+    leaveOpen?: boolean;
+    bufferSize?: number;
+  }
+
+  /**
+   * @since 1.1.2
+   */
+  export class BrotliStream implements base.IStream {
+    constructor(stream: base.IStream, mode: BrotliStreamMode, options?: BrotliStreamOptions)
+
+    get canRead(): boolean;
+
+    get canWrite(): boolean;
+
+    get canSeek(): boolean;
+
+    get position(): number;
+
+    get length(): number;
+
+    set length(value: number);
+
+    get isClosed(): boolean;
+
+
+    copyTo(stream: base.IStream, bufferSize?: number | undefined): void;
+
+    copyToAsync(stream: base.IStream, bufferSize?: number | undefined): Promise<void>;
+
+    seek(offset: number, origin: base.SeekOrigin): void;
+
+    read(buffer: BufferLike, offset?: number | undefined, count?: number | undefined): number;
+
+    readAsync(buffer: BufferLike, offset?: number | undefined, count?: number | undefined): Promise<number>;
+
+    write(buffer: BufferLike, offset?: number | undefined, count?: number | undefined): number;
+
+    writeAsync(buffer: BufferLike, offset?: number | undefined, count?: number | undefined): Promise<number>;
+
+    flush(): void;
+
+    flushAsync(): Promise<void>;
+
+    close(): void;
+
+    closeAsync(): Promise<void>;
+  }
+
+  /**
+   * @since 1.1.2
+   */
+  export interface BrotliConfig {
+    quality?: number;
+    lgWin?: number;
+    mode?: number;
+  }
+
+  /**
+   * @since 1.1.2
+   */
+  export namespace BrotliUtils {
+
+    export function compress(buffer: BufferLike | string, config?: BrotliConfig): ArrayBuffer | undefined;
+
+    export function decompress(buffer: BufferLike | string): ArrayBuffer | undefined;
+
+    export function compressAsync(buffer: BufferLike | string, config?: BrotliConfig): Promise<ArrayBuffer>
+
+    export function decompressAsync(buffer: BufferLike | string): Promise<ArrayBuffer>;
+
+  }
+
   export enum DeflateStreamMode {
     /**
      * 压缩模式
@@ -460,6 +561,8 @@ declare namespace compression {
    */
   class DeflateStream implements base.IStream {
     constructor(stream: base.IStream, mode: DeflateStreamMode, option?: DeflateStreamOption)
+
+    get isClosed(): boolean;
 
     /**
      * 解压模式可读

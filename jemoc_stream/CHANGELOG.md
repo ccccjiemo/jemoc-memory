@@ -1,3 +1,11 @@
+## [1.1.2] - 2025-02-18
+
+- IStream的异步方法增加锁机制，防止读写错误
+- 新增BrotliStream、BrotliUtils，支持Brotli加解密
+- toArrayBuffer方法增加范围设置
+
+---
+
 ## [1.1.1] - 2025-02-16
 
 - 修复MemfdStream的sendFile问题

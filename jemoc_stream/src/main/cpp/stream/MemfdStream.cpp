@@ -5,16 +5,16 @@
 // please include "napi/native_api.h".
 
 #include "stream/MemfdStream.h"
-#include <sys/sendfile.h>
 #include "IStream.h"
-#include <sys/mman.h>
-#include <fcntl.h>
-#include <unistd.h>
 #include <cerrno>
-#include <cstring>
 #include <cstdio>
+#include <cstring>
+#include <fcntl.h>
 #include <stdexcept>
+#include <sys/mman.h>
+#include <sys/sendfile.h>
 #include <sys/stat.h>
+#include <unistd.h>
 
 std::string MemfdStream::ClassName = "MemfdStream";
 napi_ref MemfdStream::cons = nullptr;
@@ -233,9 +233,14 @@ void MemfdStream::JSDisposed(napi_env env, void *data, void *hint) {
 }
 
 napi_value MemfdStream::JSToArrayBuffer(napi_env env, napi_callback_info info) {
-    GET_JS_INFO(0)
+    GET_JS_INFO(1)
     try {
-        napi_value result = static_cast<MemfdStream *>(stream)->readAllFromFd(env);
+        long offset = 0;
+        long length = stream->getLength();
+        if (argc > 0) {
+            getToArrayBufferOptions(env, argv[0], &offset, &length);
+        }
+        napi_value result = static_cast<MemfdStream *>(stream)->readAllFromFd(env, offset, length);
         return result;
     } catch (const std::exception &e) {
         NAPI_CALL(env, napi_throw_error(env, tagName, e.what()))
@@ -243,14 +248,14 @@ napi_value MemfdStream::JSToArrayBuffer(napi_env env, napi_callback_info info) {
     }
 }
 
-napi_value MemfdStream::readAllFromFd(napi_env env) {
+napi_value MemfdStream::readAllFromFd(napi_env env, long offset, long length) {
     // 获取文件大小
     void *data = nullptr;
     napi_value result = nullptr;
-    NAPI_CALL(env, napi_create_arraybuffer(env, m_length, &data, &result))
+    NAPI_CALL(env, napi_create_arraybuffer(env, length, &data, &result))
 
     // 使用 pread 从偏移量 0 读取数据，prea不会改变文件指针位置
-    ssize_t bytesRead = pread(m_fd, data, m_length, 0);
+    ssize_t bytesRead = pread(m_fd, data, length, offset);
     if (bytesRead < 0) {
         throw std::runtime_error(std::string("pread failed: ") + std::strerror(errno));
     }

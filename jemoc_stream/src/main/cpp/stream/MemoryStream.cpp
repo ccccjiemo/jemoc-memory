@@ -153,12 +153,17 @@ void MemoryStream::JSDisposed(napi_env env, void *data, void *hint) {
 }
 
 napi_value MemoryStream::JSToArrayBuffer(napi_env env, napi_callback_info info) {
-    GET_JS_INFO(0)
+    GET_JS_INFO(1)
     void *data = nullptr;
     napi_value buffer = nullptr;
     long length = stream->getLength();
-    napi_create_arraybuffer(env, length, &data, &buffer);
-    memcpy(data, ((MemoryStream *)stream)->getData(), length);
+    long offset = 0;
+    if (argc > 0) {
+        getToArrayBufferOptions(env, argv[0], &offset, &length);
+    }
+    NAPI_CALL(env, napi_create_arraybuffer(env, length, &data, &buffer));
+    
+    memcpy(data, ((MemoryStream *)stream)->getData() + offset, length);
     return buffer;
 }
 

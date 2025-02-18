@@ -1,16 +1,18 @@
 #include "BufferPool.h"
+#include "napi/native_api.h"
+#include "stream/BrotliStream.h"
 #include "stream/DeflateStream.h"
 #include "stream/FileStream.h"
 #include "stream/MemfdStream.h"
 #include "stream/MemoryStream.h"
+#include "zip/ZipArchive.h"
 #include "zip/ZipArchiveEntry.h"
 #include "zip/ZipCryptoStream.h"
-#include "zip/ZipArchive.h"
-#include "napi/native_api.h"
 
 
 EXTERN_C_START
 static napi_value Init(napi_env env, napi_value exports) {
+    IStream::Export(env, exports);
     MemfdStream::Export(env, exports);
     MemoryStream::Export(env, exports);
     FileStream::Export(env, exports);
@@ -20,6 +22,8 @@ static napi_value Init(napi_env env, napi_value exports) {
     ZipArchiveEntry::Export(env, exports);
     Inflater::Export(env, exports);
     Deflater::Export(env, exports);
+    BrotliStream::Export(env, exports);
+    BrotliJs::Export(env, exports);
     jemoc_stream::BufferPool::Export(env, exports);
     jemoc_stream::LruBufferPool::Export(env, exports);
     return exports;

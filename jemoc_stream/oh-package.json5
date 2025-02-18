@@ -1,13 +1,14 @@
 {
   "name": "@jemoc/stream",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "参考.net Stream方法实现,并提供Deflate方法.",
   "keywords": [
     "deflate",
     "inflate",
     "stream",
     "transform",
-    "zip"
+    "zip",
+    "brotli"
   ],
   "main": "Index.ets",
   "types": "Index.d.ets",

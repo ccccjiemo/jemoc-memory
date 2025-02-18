@@ -7,6 +7,9 @@
 #include "IStream.h"
 #include "common.h"
 
+napi_value IStream::cons = nullptr;
+std::string IStream::ClassName = "StreamBase";
+
 void IStream::copyTo(IStream *stream, long bufferSize) {
     byte *buffer = new byte[bufferSize];
     long readBytes = 0;
@@ -45,6 +48,7 @@ void IStream::close() {
     m_canWrite = false;
     m_canSeek = false;
     m_canGetLength = false;
+    m_canSetLength = false;
 }
 
 
@@ -211,6 +215,7 @@ napi_value IStream::JSReadAsync(napi_env env, napi_callback_info info) {
         env, nullptr, resouce_name,
         [](napi_env env, void *data) {
             AsyncWorkData *asyncData = static_cast<AsyncWorkData *>(data);
+            std::lock_guard<std::mutex> lock(asyncData->stream->mutex_);
             asyncData->result = asyncData->stream->read(asyncData->buffer, asyncData->offset, asyncData->count);
         },
         [](napi_env env, napi_status status, void *data) {
@@ -256,6 +261,7 @@ napi_value IStream::JSWriteAsync(napi_env env, napi_callback_info info) {
         env, nullptr, resouce_name,
         [](napi_env env, void *data) {
             AsyncWorkData *asyncData = static_cast<AsyncWorkData *>(data);
+            std::lock_guard<std::mutex> lock(asyncData->stream->mutex_);
             asyncData->result = asyncData->stream->write(asyncData->buffer, asyncData->offset, asyncData->count);
         },
         [](napi_env env, napi_status status, void *data) {
@@ -307,6 +313,7 @@ napi_value IStream::JSCopyToAsync(napi_env env, napi_callback_info info) {
         env, nullptr, resouce_name,
         [](napi_env env, void *data) {
             AsyncWorkData *asyncData = static_cast<AsyncWorkData *>(data);
+            std::lock_guard<std::mutex> lock(asyncData->stream->mutex_);
             asyncData->stream->copyTo(asyncData->targetStream, asyncData->bufferSize);
         },
         [](napi_env env, napi_status status, void *data) {
@@ -340,6 +347,7 @@ napi_value IStream::JSFlushAsync(napi_env env, napi_callback_info info) {
         env, nullptr, resouce_name,
         [](napi_env env, void *data) {
             AsyncWorkData *asyncData = static_cast<AsyncWorkData *>(data);
+            std::lock_guard<std::mutex> lock(asyncData->stream->mutex_);
             asyncData->stream->flush();
         },
         [](napi_env env, napi_status status, void *data) {
@@ -376,6 +384,7 @@ napi_value IStream::JSCloseAsync(napi_env env, napi_callback_info info) {
         },
         [](napi_env env, napi_status status, void *data) {
             AsyncWorkData *asyncData = static_cast<AsyncWorkData *>(data);
+            std::lock_guard<std::mutex> lock(asyncData->stream->mutex_);
             napi_value result = nullptr;
             if (status == napi_ok) {
                 napi_get_undefined(env, &result);
@@ -422,4 +431,41 @@ napi_value IStream::JSGetIsClosed(napi_env env, napi_callback_info info) {
     napi_value result = nullptr;
     NAPI_CALL(env, napi_get_boolean(env, value, &result))
     return result;
+}
+
+
+void IStream::Export(napi_env env, napi_value exports) {
+    napi_property_descriptor desc[] = {
+        DEFINE_NAPI_FUNCTION("canRead", nullptr, IStream::JSGetCanRead, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("canWrite", nullptr, IStream::JSGetCanWrite, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("canSeek", nullptr, IStream::JSGetCanSeek, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("position", nullptr, IStream::JSGetPosition, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("length", nullptr, IStream::JSGetLength, IStream::JSSetLength, nullptr),
+        DEFINE_NAPI_FUNCTION("copyTo", IStream::JSCopyTo, nullptr, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("seek", IStream::JSSeek, nullptr, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("read", IStream::JSRead, nullptr, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("write", IStream::JSWrite, nullptr, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("flush", IStream::JSFlush, nullptr, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("close", IStream::JSClose, nullptr, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("readAsync", IStream::JSReadAsync, nullptr, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("writeAsync", IStream::JSWriteAsync, nullptr, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("copyToAsync", IStream::JSCopyToAsync, nullptr, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("flushAsync", IStream::JSFlushAsync, nullptr, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("closeAsync", IStream::JSCloseAsync, nullptr, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("isClosed", nullptr, IStream::JSGetIsClosed, nullptr, nullptr),
+    };
+    NAPI_CALL(env, napi_define_class(
+                       env, ClassName.c_str(), NAPI_AUTO_LENGTH,
+                       [](napi_env env, napi_callback_info info) -> napi_value { return nullptr; }, nullptr,
+                       sizeof(desc) / sizeof(desc[0]), desc, &cons));
+
+    NAPI_CALL(env, napi_set_named_property(env, exports, ClassName.c_str(), cons))
+}
+
+void IStream::Extends(napi_env env, napi_value constructor) {
+    napi_value baseCon = nullptr;
+    napi_value extendCon = nullptr;
+    NAPI_CALL(env, napi_get_named_property(env, cons, "prototype", &baseCon))
+    NAPI_CALL(env, napi_get_named_property(env, constructor, "prototype", &extendCon))
+    NAPI_CALL(env, napi_set_named_property(env, extendCon, "__proto__", baseCon))
 }

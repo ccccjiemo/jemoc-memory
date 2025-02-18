@@ -4,6 +4,11 @@ export type BufferLike = ArrayBufferLike | Uint8Array;
 
 export enum SeekOrigin { Begin, Current, End }
 
+export interface ToArrayBufferOptions {
+  offset?: number;
+  length?: number;
+}
+
 export interface DeflateStreamOption {
   leaveOpen?: boolean;
   windowBits?: number;
@@ -17,7 +22,7 @@ export interface BufferPoolStats {
   used: number
 }
 
-export abstract class BufferPool {
+declare abstract class BufferPool {
   abstract acquire(size: number): ArrayBuffer
 
   abstract release(buffer: ArrayBuffer): void
@@ -35,8 +40,45 @@ export class LruBufferPool extends BufferPool {
   release(buffer: ArrayBuffer): void;
 }
 
-export interface IStream {
+export abstract class StreamBase {
+  get canRead(): boolean;
 
+  get canWrite(): boolean;
+
+  get canSeek(): boolean;
+
+  get position(): number;
+
+  get length(): number;
+
+  set length(value: number);
+
+  get isClosed(): boolean;
+
+  copyTo(stream: IStream, bufferSize?: number): void
+
+  copyToAsync(stream: IStream, bufferSize?: number): Promise<void>
+
+  seek(offset: number, origin: number): void
+
+  read(buffer: BufferLike, offset?: number, count?: number): number
+
+  readAsync(buffer: BufferLike, offset?: number, count?: number): Promise<number>
+
+  write(buffer: BufferLike, offset?: number, count?: number): number
+
+  writeAsync(buffer: BufferLike, offset?: number, count?: number): Promise<number>
+
+  flush(): void
+
+  flushAsync(): Promise<void>
+
+  close(): void
+
+  closeAsync(): Promise<void>
+}
+
+export interface IStream {
 
   get canRead(): boolean;
 
@@ -118,7 +160,7 @@ export class MemoryStream implements IStream {
 
   set capacity(value: number)
 
-  toArrayBuffer(): ArrayBuffer
+  toArrayBuffer(options?: ToArrayBufferOptions): ArrayBuffer
 }
 
 export class FileStream implements IStream {
@@ -391,15 +433,43 @@ export class MemfdStream implements IStream {
 
   closeAsync(): Promise<void>;
 
-  toArrayBuffer(): ArrayBuffer;
+  toArrayBuffer(options?: ToArrayBufferOptions): ArrayBuffer;
 
   get fd(): number;
 
   sendFile(fd: number, options?: SendFileOptions): boolean
 
-  sendFile(path: string, mode: number,  options?: SendFileOptions): boolean
+  sendFile(path: string, mode: number, options?: SendFileOptions): boolean
 
   sendFileAsync(fd: number, options?: SendFileOptions): Promise<boolean>
 
-  sendFileAsync(path: string, mode: number,  options?: SendFileOptions): Promise<boolean>
+  sendFileAsync(path: string, mode: number, options?: SendFileOptions): Promise<boolean>
+}
+
+export interface BrotliStreamOptions {
+  quality?: number;
+  lgWin?: number;
+  mode?: number;
+  leaveOpen?: boolean;
+  bufferSize?: number;
+}
+
+export class BrotliStream extends StreamBase {
+  constructor(stream: IStream, mode: number, options?: BrotliStreamOptions)
+}
+
+export interface BrotliConfig {
+  quality?: number;
+  lgWin?: number;
+  mode?: number;
+}
+
+export class BrotliUtils {
+  static compress(buffer: BufferLike | string, config?: BrotliConfig): ArrayBuffer | undefined;
+
+  static decompress(buffer: BufferLike | string): ArrayBuffer | undefined;
+
+  static compressAsync(buffer: BufferLike | string, config?: BrotliConfig): Promise<ArrayBuffer>;
+
+  static decompressAsync(buffer: BufferLike | string): Promise<ArrayBuffer>
 }

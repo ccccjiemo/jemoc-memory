@@ -27,3 +27,5 @@ export { Deflator } from './Deflator'
 export { DeflateStream, DeflateStreamMode } from './DeflateStream'
 
 export { ZipArchive, ZipArchiveEntry, ZipArchiveOption } from './ZipArchive'
+
+export { BrotliStream, BrotliStreamOptions, BrotliStreamMode, BrotliUtils, BrotliConfig } from './BrotliStream'

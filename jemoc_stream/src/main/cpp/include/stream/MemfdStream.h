@@ -51,7 +51,7 @@ public:
     static napi_value JSSendFileAsync(napi_env env, napi_callback_info info);
     static void initSendFile(napi_env env, napi_callback_info info, int &fd, long &offset, long &length,
                              bool &autoClose, MemfdStream **fdStream);
-    napi_value readAllFromFd(napi_env env);
+    napi_value readAllFromFd(napi_env env, long offset, long length);
 
 private:
     int m_fd;

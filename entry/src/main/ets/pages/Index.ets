@@ -10,6 +10,21 @@ struct Index {
 
   build() {
     Column() {
+      Button('test brotliStream').onClick(async () => {
+
+        try {
+          const data = util.TextEncoder.create().encodeInto("hello world!");
+          const compressData = compression.BrotliUtils.compress(data);
+          const uncompressData = compression.BrotliUtils.decompress(compressData!);
+
+          const result = util.TextDecoder.create().decodeToString(new Uint8Array(uncompressData));
+
+          console.log('finish');
+        } catch (e) {
+          console.log(e)
+        }
+
+      })
       Button('test fd').onClick(async (event: ClickEvent) => {
         const cache = getContext(this).cacheDir;
         const fd = await getContext(this).resourceManager.getRawFd('0002.jpg');
