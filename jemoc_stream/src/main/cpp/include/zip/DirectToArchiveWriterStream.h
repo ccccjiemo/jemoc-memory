@@ -12,7 +12,8 @@
 
 class DirectToArchiveWriterStream : public IStream {
 public:
-    DirectToArchiveWriterStream(IStream *stream, ZipArchiveEntry *entry) : m_stream(stream), m_entry(entry) {
+    DirectToArchiveWriterStream(std::shared_ptr<IStream> stream, ZipArchiveEntry *entry)
+        : m_stream(stream), m_entry(entry) {
         m_position = 0;
         m_everWritten = false;
         m_canWrite = true;
@@ -35,7 +36,8 @@ public:
             return;
         IStream::close();
         m_stream->close();
-        delete m_stream;
+//        delete m_stream;
+        m_stream.reset();
         m_stream = nullptr;
         if (!m_everWritten) {
             m_entry->writeLocalFileHeader();
@@ -49,7 +51,8 @@ public:
     }
 
 private:
-    IStream *m_stream;
+    // crc checksum
+    std::shared_ptr<IStream> m_stream;
     ZipArchiveEntry *m_entry;
     bool m_everWritten;
 };

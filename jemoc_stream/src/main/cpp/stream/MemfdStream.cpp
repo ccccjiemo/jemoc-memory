@@ -204,33 +204,34 @@ napi_value MemfdStream::JSConstructor(napi_env env, napi_callback_info info) {
     napi_valuetype type;
     NAPI_CALL(env, napi_typeof(env, argv[0], &type))
 
-    MemfdStream *stream = nullptr;
-
+//    MemfdStream *stream = nullptr;
+    std::shared_ptr<IStream> stream;
     try {
         if (type == napi_undefined) {
-            stream = new MemfdStream();
+            stream = std::make_shared<MemfdStream>();
         } else {
             void *data = nullptr;
             size_t length = 0;
             getBuffer(env, argv[0], &data, &length);
-            stream = new MemfdStream(data, length);
+            stream = std::make_shared<MemfdStream>(data, length);
         }
     } catch (const std::exception &e) {
         napi_throw_error(env, tagName, e.what());
         return nullptr;
     }
-    NAPI_CALL(env, napi_wrap(env, _this, stream, JSDisposed, nullptr, nullptr))
-    return _this;
+//    NAPI_CALL(env, napi_wrap(env, _this, stream, JSDisposed, nullptr, nullptr))
+//    return _this;
+    return JSBind(env, _this, stream);
 }
 
-void MemfdStream::JSDisposed(napi_env env, void *data, void *hint) {
-    try {
-        MemfdStream *stream = static_cast<MemfdStream *>(data);
-        stream->close();
-        delete stream;
-    } catch (const std::exception &e) {
-    }
-}
+// void MemfdStream::JSDisposed(napi_env env, void *data, void *hint) {
+//     try {
+//         MemfdStream *stream = static_cast<MemfdStream *>(data);
+//         stream->close();
+//         delete stream;
+//     } catch (const std::exception &e) {
+//     }
+// }
 
 napi_value MemfdStream::JSToArrayBuffer(napi_env env, napi_callback_info info) {
     GET_JS_INFO(1)
@@ -240,7 +241,7 @@ napi_value MemfdStream::JSToArrayBuffer(napi_env env, napi_callback_info info) {
         if (argc > 0) {
             getToArrayBufferOptions(env, argv[0], &offset, &length);
         }
-        napi_value result = static_cast<MemfdStream *>(stream)->readAllFromFd(env, offset, length);
+        napi_value result = static_cast<MemfdStream *>(stream.get())->readAllFromFd(env, offset, length);
         return result;
     } catch (const std::exception &e) {
         NAPI_CALL(env, napi_throw_error(env, tagName, e.what()))
@@ -265,7 +266,7 @@ napi_value MemfdStream::readAllFromFd(napi_env env, long offset, long length) {
 napi_value MemfdStream::JSGetFd(napi_env env, napi_callback_info info) {
     GET_JS_INFO(0)
     napi_value result = nullptr;
-    int fd = static_cast<MemfdStream *>(stream)->getFd();
+    int fd = static_cast<MemfdStream *>(stream.get())->getFd();
 
     NAPI_CALL(env, napi_create_int32(env, fd, &result));
     return result;
@@ -385,7 +386,7 @@ void MemfdStream::initSendFile(napi_env env, napi_callback_info info, int &fd, l
     length = stream->getLength();
     int optionsIndex = 0;
 
-    *fdStream = static_cast<MemfdStream *>(stream);
+    *fdStream = static_cast<MemfdStream *>(stream.get());
 
 
     NAPI_CALL(env, napi_typeof(env, argv[0], &type))
@@ -482,7 +483,7 @@ napi_value MemfdStream::JSSendFileAsync(napi_env env, napi_callback_info info) {
 
 void MemfdStream::Export(napi_env env, napi_value exports) {
     napi_property_descriptor desc[] = {
-        DEFINE_NAPI_ISTREAM_PROPERTY((void *)ClassName.c_str()),
+//        DEFINE_NAPI_ISTREAM_PROPERTY((void *)ClassName.c_str()),
         DEFINE_NAPI_FUNCTION("fd", nullptr, JSGetFd, nullptr, nullptr),
         DEFINE_NAPI_FUNCTION("toArrayBuffer", JSToArrayBuffer, nullptr, nullptr, nullptr),
         DEFINE_NAPI_FUNCTION("sendFile", JSSendFile, nullptr, nullptr, nullptr),
@@ -492,7 +493,7 @@ void MemfdStream::Export(napi_env env, napi_value exports) {
     napi_define_class(env, ClassName.c_str(), NAPI_AUTO_LENGTH, JSConstructor, nullptr, sizeof(desc) / sizeof(desc[0]),
                       desc, &napi_cons);
     napi_create_reference(env, napi_cons, 1, &cons);
-
+    Extends(env, napi_cons);
     napi_set_named_property(env, exports, ClassName.c_str(), napi_cons);
 }
 

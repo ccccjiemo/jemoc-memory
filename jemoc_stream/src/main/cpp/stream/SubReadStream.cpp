@@ -6,7 +6,7 @@
 
 #include "stream/SubReadStream.h"
 
-SubReadStream::SubReadStream(IStream *stream, long startPosition, size_t maxLength, bool leaveOpen)
+SubReadStream::SubReadStream(std::shared_ptr<IStream> stream, long startPosition, size_t maxLength, bool leaveOpen)
     : m_stream(stream), m_startInStream(startPosition), m_endInStream(startPosition + maxLength),
       m_leaveOpen(leaveOpen) {
     m_position = 0;
@@ -17,25 +17,36 @@ SubReadStream::SubReadStream(IStream *stream, long startPosition, size_t maxLeng
 
 SubReadStream::~SubReadStream() { close(); }
 
-bool SubReadStream::getCanRead() const { return m_stream->getCanRead() && m_canRead; }
+bool SubReadStream::getCanRead() const {
+    if (auto stream = m_stream.lock()) {
+        return stream->getCanRead() && m_canRead;
+    } else {
+        return false;
+    }
+}
 
 long SubReadStream::read(void *buffer, long offset, size_t count) {
-    if ((m_position + m_startInStream) != m_stream->getPosition()) {
-        m_stream->seek(m_position + m_startInStream, SeekOrigin::Begin);
+
+    if (auto stream = m_stream.lock()) {
+        if ((m_position + m_startInStream) != stream->getPosition()) {
+            stream->seek(m_position + m_startInStream, SeekOrigin::Begin);
+        }
+        size_t _count = std::min((size_t)(m_endInStream - m_startInStream - m_position), count);
+        long result = stream->read(buffer, offset, _count);
+        m_position += result;
+        return result;
+    } else {
+        throw std::ios::failure("stream is closed");
     }
-    size_t _count = std::min((size_t)(m_endInStream - m_startInStream - m_position), count);
-    long result = m_stream->read(buffer, offset, _count);
-    m_position += result;
-    return result;
 }
 
 void SubReadStream::close() {
     if (m_closed)
         return;
     IStream::close();
-    if (!m_leaveOpen && m_stream != nullptr) {
-        m_stream->close();
-        delete m_stream;
-        m_stream = nullptr;
+    auto stream = m_stream.lock();
+    if (!m_leaveOpen && stream) {
+        stream->close();
+        m_stream.reset();
     }
 }

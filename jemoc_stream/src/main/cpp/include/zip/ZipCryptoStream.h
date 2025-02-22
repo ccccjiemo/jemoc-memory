@@ -19,9 +19,9 @@ enum CryptoMode { CryptoMode_Decode, CryptoMode_Encode };
 
 class ZipCryptoStream : public IStream {
 public:
-    ZipCryptoStream(IStream *stream, CryptoMode mode, const std::string &password, bool leaveOpen,
+    ZipCryptoStream(std::shared_ptr<IStream> stream, CryptoMode mode, const std::string &password, bool leaveOpen,
                     unsigned long crc = 0, size_t bufferSize = ZipCryptoStream_DefaultBufferSize);
-    ZipCryptoStream(IStream *stream, CryptoMode mode, ZipArchiveEntry *entry, bool leaveOpen,
+    ZipCryptoStream(std::shared_ptr<IStream> stream, CryptoMode mode, ZipArchiveEntry *entry, bool leaveOpen,
                     size_t bufferSize = ZipCryptoStream_DefaultBufferSize);
     ~ZipCryptoStream();
 
@@ -47,7 +47,7 @@ private:
     void encodeStream(void *buffer, long offset, size_t count);
 
 private:
-    IStream *m_stream = nullptr;
+    std::shared_ptr<IStream> m_stream;
     CryptoMode m_mode;
     std::string m_password;
     bool m_leaveOpen;

@@ -7,12 +7,13 @@
 #include "zip/ZipArchive.h"
 #include "stream/FileStream.h"
 #include "stream/MemoryStream.h"
+#include "zip/ZipArchiveEntry.h"
 #include "zip/ZipHelper.h"
 #include "zip/ZipRecord.h"
-#include "zip/ZipArchiveEntry.h"
 
 
-ZipArchive::ZipArchive(IStream *stream, const ZipArchiveMode mode, const std::string &password, bool leaveOpen)
+ZipArchive::ZipArchive(std::shared_ptr<IStream> stream, const ZipArchiveMode mode, const std::string &password,
+                       bool leaveOpen)
     : m_mode(mode), m_leaveOpen(leaveOpen), m_passwd(password) {
     if (stream == nullptr)
         throw std::invalid_argument("argument stream is null.");
@@ -24,8 +25,8 @@ ZipArchive::ZipArchive(IStream *stream, const ZipArchiveMode mode, const std::st
             throw std::invalid_argument("cannot use read mode on a non-readable stream.");
         if (!stream->getCanSeek()) {
             m_backingStream = stream;
-            stream = new MemoryStream();
-            m_backingStream->copyTo(stream, 8192);
+            stream = std::make_shared<MemoryStream>();
+            m_backingStream->copyTo(stream.get(), 8192);
             stream->seek(0, SeekOrigin::Begin);
         }
         break;
@@ -73,14 +74,16 @@ ZipArchive::ZipArchive(const std::string &path, const ZipArchiveMode mode, const
         fileMode = FILE_MODE_WRITE | FILE_MODE_APPEND;
         break;
     }
-    IStream *stream = new FileStream(path, FILE_MODE(fileMode), 8192);
+    std::shared_ptr<IStream> stream = std::make_shared<FileStream>(path, FILE_MODE(fileMode), 8192);
 
     new (this) ZipArchive(stream, mode, password, false);
 }
 
 ZipArchive::ZipArchive(const int &fd, const long &offset, const long &length, const std::string &password)
     : m_mode(ZipArchiveMode_Read), m_leaveOpen(false), m_passwd(password) {
-    new (this) ZipArchive(new FileStream(fd, offset, length), ZipArchiveMode_Read, password, false);
+    std::shared_ptr<IStream> stream = std::make_shared<FileStream>(fd, offset, length);
+
+    new (this) ZipArchive(stream, ZipArchiveMode_Read, password, false);
 }
 
 
@@ -128,12 +131,12 @@ ZipArchiveMode ZipArchive::getMode() const { return m_mode; }
 
 void ZipArchive::readEndOfCentralDirectory() {
     m_stream->seek(-ZIP_EOCD_SIZEOFRECORD_WITHOUT_SIGNATURE, SeekOrigin::End);
-    if (!ZipHelper::seekBackwardsToSignature(m_stream, ZIP_EOCD_SIGNATURE, USHRT_MAX - sizeof(uint)))
+    if (!ZipHelper::seekBackwardsToSignature(m_stream.get(), ZIP_EOCD_SIGNATURE, USHRT_MAX - sizeof(uint)))
         throw std::ios::failure("end of central directory record could not be found.");
 
 //     long eocdStart = m_stream->getPosition();
     ZipEndOfCentralDirectoryRecord eocd;
-    if (!ZipEndOfCentralDirectoryRecord::tryReadRecord(m_stream, &eocd))
+    if (!ZipEndOfCentralDirectoryRecord::tryReadRecord(m_stream.get(), &eocd))
         throw std::ios::failure("read end of central directory record failed.");
 
     m_numberOfThisDisk = eocd.diskNumber;
@@ -159,7 +162,7 @@ void ZipArchive::readCentralDirectory() {
     m_stream->seek(m_centralDirectoryStart, SeekOrigin::Begin);
     long numberOfEntries = 0;
     ZipCentralDirectoryRecord header;
-    while (ZipCentralDirectoryRecord::tryReadRecord(m_stream, false, &header)) {
+    while (ZipCentralDirectoryRecord::tryReadRecord(m_stream.get(), false, &header)) {
         addEntry(new ZipArchiveEntry(this, header));
         numberOfEntries++;
     }
@@ -306,7 +309,7 @@ napi_value ZipArchive::JSConstructor(napi_env env, napi_callback_info info) {
             std::string path = getString(env, argv[0]);
             zip = new ZipArchive(path, ZipArchiveMode(mode), passwd);
         } else {
-            IStream *stream = getStream(env, argv[0]);
+            std::shared_ptr<IStream> stream = IStream::GetStream(env, argv[0]);
             if (stream == nullptr) {
                 napi_value js_fd = nullptr;
                 napi_value js_offset = nullptr;
@@ -350,6 +353,7 @@ void ZipArchive::Export(napi_env env, napi_value exports) {
         DEFINE_NAPI_FUNCTION("createEntry", JSCreateEntry, nullptr, nullptr, nullptr),
         DEFINE_NAPI_FUNCTION("close", JSClose, nullptr, nullptr, nullptr),
         DEFINE_NAPI_FUNCTION("isClosed", nullptr, JSGetIsClosed, nullptr, nullptr),
+        DEFINE_NAPI_FUNCTION("entryNames", nullptr, JSGetEntryNames, nullptr, nullptr),
     };
     napi_value napi_cons = nullptr;
     NAPI_CALL(env, napi_define_class(env, ClassName.c_str(), NAPI_AUTO_LENGTH, JSConstructor, nullptr,
@@ -455,6 +459,8 @@ napi_value ZipArchive::JSCreateEntry(napi_env env, napi_callback_info info) {
 napi_value ZipArchive::JSClose(napi_env env, napi_callback_info info) {
     GET_ZIPARCHIVE_INFO(0)
     archive->close(env);
+    void *result = nullptr;
+    NAPI_CALL(env, napi_remove_wrap(env, _this, &result))
     return nullptr;
 }
 
@@ -478,5 +484,18 @@ napi_value ZipArchive::JSGetIsClosed(napi_env env, napi_callback_info info) {
     return result;
 }
 
+napi_value ZipArchive::JSGetEntryNames(napi_env env, napi_callback_info info) {
+    GET_ZIPARCHIVE_INFO(0)
+    auto entries = archive->getEntries();
+    napi_value result = nullptr;
+    NAPI_CALL(env, napi_create_array_with_length(env, entries.size(), &result))
+    napi_value jsName;
+    for (int i = 0; i < entries.size(); i++) {
+        auto name = entries[i]->getFullName();
+        NAPI_CALL(env, napi_create_string_utf8(env, name.c_str(), name.size(), &jsName));
+        NAPI_CALL(env, napi_set_element(env, result, i, jsName));
+    }
+    return result;
+}
 
 #endif // ZIPARCHIVE_NAPI_FUNCTION

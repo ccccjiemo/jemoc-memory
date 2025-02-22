@@ -101,7 +101,6 @@ FileStream::FileStream(const int &fd, long offset, long length) : m_offset(offse
 
 FileStream::~FileStream() {
     if (!m_closed) {
-        IStream::close();
         close();
     }
 }
@@ -131,7 +130,6 @@ long FileStream::read(void *buffer, long offset, size_t count) {
     readBytes = std::min(readBytes, m_length - m_position);
     if (readBytes == 0)
         return 0;
-
     if (fseek(file, m_offset + m_position, SEEK_SET) != 0)
         throw std::ios_base::failure("Seek failed: " + std::string(strerror(errno)));
 
@@ -167,13 +165,12 @@ void FileStream::close() {
 }
 
 void FileStream::Export(napi_env env, napi_value exports) {
-    napi_property_descriptor desc[] = {
-        DEFINE_NAPI_ISTREAM_PROPERTY((void *)ClassName.c_str()),
-    };
+//    napi_property_descriptor desc[] = {
+//        DEFINE_NAPI_ISTREAM_PROPERTY((void *)ClassName.c_str()),
+//    };
     napi_value napi_cons = nullptr;
-    napi_define_class(env, ClassName.c_str(), NAPI_AUTO_LENGTH, JSConstructor, nullptr, sizeof(desc) / sizeof(desc[0]),
-                      desc, &napi_cons);
-    napi_create_reference(env, napi_cons, 1, &cons);
+    napi_define_class(env, ClassName.c_str(), NAPI_AUTO_LENGTH, JSConstructor, nullptr, 0, nullptr, &napi_cons);
+    Extends(env, napi_cons);
 
     napi_set_named_property(env, exports, ClassName.c_str(), napi_cons);
 }
@@ -187,14 +184,15 @@ napi_value FileStream::JSConstructor(napi_env env, napi_callback_info info) {
 
 
     int mode = getInt(env, argv[1]);
-    FileStream *stream = nullptr;
+//    FileStream *stream = nullptr;
+    std::shared_ptr<IStream> stream;
     try {
         if (type == napi_string) {
             std::string path = getString(env, argv[0]);
-            stream = new FileStream(path, FILE_MODE(mode), DEFAULT_BUFFER_SIZE);
+            stream = std::make_shared<FileStream>(path, FILE_MODE(mode), DEFAULT_BUFFER_SIZE);
         } else if (type == napi_number) {
             int fd = getInt(env, argv[0]);
-            stream = new FileStream(fd, FILE_MODE(mode), DEFAULT_BUFFER_SIZE);
+            stream = std::make_shared<FileStream>(fd, FILE_MODE(mode), DEFAULT_BUFFER_SIZE);
         } else {
             napi_value js_fd = nullptr;
             napi_value js_offset = nullptr;
@@ -208,23 +206,24 @@ napi_value FileStream::JSConstructor(napi_env env, napi_callback_info info) {
             NAPI_CALL(env, napi_get_value_int32(env, js_fd, &fd))
             NAPI_CALL(env, napi_get_value_int64(env, js_offset, &offset))
             NAPI_CALL(env, napi_get_value_int64(env, js_length, &length))
-            stream = new FileStream(fd, offset, length);
+            stream = std::make_shared<FileStream>(fd, offset, length);
         }
     } catch (const std::ios_base::failure &e) {
-        napi_throw_error(env, "JSFileStream:", e.what());
+        napi_throw_error(env, "JSFileStream", e.what());
         return nullptr;
     }
 
-    napi_wrap(env, _this, stream, JSDispose, nullptr, nullptr);
-    return _this;
+//    napi_wrap(env, _this, stream, JSDispose, nullptr, nullptr);
+//    return _this;
+    return JSBind(env, _this, stream);
 }
 
-void FileStream::JSDispose(napi_env env, void *data, void *hint) {
-    FileStream *stream = static_cast<FileStream *>(data);
-    stream->close();
-
-    delete stream;
-}
+// void FileStream::JSDispose(napi_env env, void *data, void *hint) {
+//     FileStream *stream = static_cast<FileStream *>(data);
+//     stream->close();
+//
+//     delete stream;
+// }
 
 void FileStream::setLength(long length) {
     if (-1 == ftruncate(fileno(file), length)) {

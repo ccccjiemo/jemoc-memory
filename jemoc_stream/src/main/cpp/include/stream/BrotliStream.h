@@ -72,7 +72,7 @@ public:
 
 
 public:
-    BrotliStream(IStream *stream, CompressionMode compressionMode, const BrotliConfig &config, bool leaveOpen,
+    BrotliStream(std::shared_ptr<IStream> stream, CompressionMode compressionMode, const BrotliConfig &config, bool leaveOpen,
                  size_t bufferSize);
     ~BrotliStream();
 
@@ -84,9 +84,9 @@ public:
 public:
     static napi_value JSConstructor(napi_env env, napi_callback_info info);
     static std::string ClassName;
-    static void JSDispose(napi_env env, void *data, void *hint);
+//    static void JSDispose(napi_env env, void *data, void *hint);
     static void Export(napi_env env, napi_value exports);
-    napi_ref stream_ref = nullptr;
+//    napi_ref stream_ref = nullptr;
 
 
 private:
@@ -96,7 +96,7 @@ private:
 private:
     BrotliDecoder *m_decoder;
     BrotliEncoder *m_encoder;
-    IStream *m_stream;
+    std::shared_ptr<IStream> m_stream;
     CompressionMode m_mode;
     uint8_t *buffer_;
     long bufferOffset_;
@@ -150,6 +150,7 @@ class BrotliJs {
         napi_value result;
         BrotliConfig config;
     };
+
 public:
     static napi_value JSDecompress(napi_env env, napi_callback_info info);
     static napi_value JSCompress(napi_env env, napi_callback_info info);

@@ -36,7 +36,7 @@ public:
     static napi_ref cons;
     static void Export(napi_env env, napi_value exports);
     static napi_value JSConstructor(napi_env env, napi_callback_info info);
-    static void JSDispose(napi_env env, void *data, void *hint);
+//    static void JSDispose(napi_env env, void *data, void *hint);
 
 private:
     FILE_MODE m_mode;

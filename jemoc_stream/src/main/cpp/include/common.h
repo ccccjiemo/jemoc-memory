@@ -62,10 +62,10 @@ static void *offset_pointer(void *target, long offset) {
     return buffer;
 }
 
-static IStream *getStream(napi_env env, napi_value value) {
+static std::shared_ptr<IStream> *getStream(napi_env env, napi_value value) {
     void *strm = nullptr;
     napi_unwrap(env, value, &strm);
-    return static_cast<IStream *>(strm);
+    return static_cast<std::shared_ptr<IStream>*>(strm);
 }
 
 static long getLong(napi_env env, napi_value value) {

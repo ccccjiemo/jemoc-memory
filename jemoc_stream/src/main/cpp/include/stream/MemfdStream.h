@@ -43,7 +43,7 @@ public:
     static std::string ClassName;
     static napi_ref cons;
     static napi_value JSConstructor(napi_env env, napi_callback_info info);
-    static void JSDisposed(napi_env env, void *data, void *hint);
+//    static void JSDisposed(napi_env env, void *data, void *hint);
     static napi_value JSToArrayBuffer(napi_env env, napi_callback_info info);
     static void Export(napi_env env, napi_value exports);
     static napi_value JSGetFd(napi_env env, napi_callback_info info);

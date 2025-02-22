@@ -11,7 +11,7 @@
 
 class WrappedStream : public IStream {
 public:
-    WrappedStream(IStream *stream, ZipArchiveEntry *entry, bool leaveOpen, std::function<void()> onClose)
+    WrappedStream(std::shared_ptr<IStream> stream, ZipArchiveEntry *entry, bool leaveOpen, std::function<void()> onClose)
         : m_stream(stream), m_leaveOpen(leaveOpen), m_onClose(onClose), m_entry(entry) {}
     ~WrappedStream() { close(); }
     bool getCanSeek() const override { return !m_closed && m_stream->getCanSeek(); }
@@ -51,7 +51,7 @@ public:
 
 private:
     ZipArchiveEntry *m_entry = nullptr;
-    IStream *m_stream = nullptr;
+    std::shared_ptr<IStream> m_stream = nullptr;
     bool m_leaveOpen = false;
     std::function<void()> m_onClose;
 };

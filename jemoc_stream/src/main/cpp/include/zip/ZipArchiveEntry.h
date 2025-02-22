@@ -10,8 +10,8 @@
 #include "stream/MemoryStream.h"
 #include "zip/ZipRecord.h"
 #include <cstdint>
-#include <string>
 #include <napi/native_api.h>
+#include <string>
 #include <sys/types.h>
 
 class ZipArchive;
@@ -47,7 +47,7 @@ public:
     ZipArchiveEntry(ZipArchive *archive, const std::string &entryName, int compressionLevel);
     ~ZipArchiveEntry();
 
-    IStream *open();
+    std::shared_ptr<IStream> open();
     bool getIsEncrypted() const;
     void setIsEncrypted(const bool &value);
     CompressionLevel getCompressionLevel() const;
@@ -76,12 +76,12 @@ public:
     ZipArchive *getArchive();
 
 private:
-    IStream *openInReadMode();
-    IStream *openInCreateMode();
-    IStream *openInUpdateMode();
-    IStream *getDataDecompressor(IStream *stream);
-    IStream *getDataCompressor(IStream *stream, bool leaveOpen);
-    IStream *getUncompressedData();
+    std::shared_ptr<IStream> openInReadMode();
+    std::shared_ptr<IStream> openInCreateMode();
+    std::shared_ptr<IStream> openInUpdateMode();
+    std::shared_ptr<IStream> getDataDecompressor(std::shared_ptr<IStream> stream);
+    std::shared_ptr<IStream> getDataCompressor(std::shared_ptr<IStream> stream, bool leaveOpen);
+    std::shared_ptr<IStream> getUncompressedData();
     void closeStream();
     void Delete();
 
@@ -171,8 +171,8 @@ private:
     bool m_currentlyOpenForWrite = false;
 
     IStream *m_outstandingWriteStream = nullptr;
-    MemoryStream *compressedBytes = nullptr;
-    MemoryStream *uncompressedData = nullptr;
+    std::shared_ptr<MemoryStream> compressedBytes = nullptr;
+    std::shared_ptr<MemoryStream> uncompressedData = nullptr;
 
     byte *cdExtraFields = nullptr;
     byte *lfExtraFields = nullptr;

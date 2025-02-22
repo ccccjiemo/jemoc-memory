@@ -10,7 +10,7 @@
 
 class SubReadStream : public IStream {
 public:
-    SubReadStream(IStream *stream, long startPosition, size_t maxLength, bool leaveOpen);
+    SubReadStream(std::shared_ptr<IStream> stream, long startPosition, size_t maxLength, bool leaveOpen);
     ~SubReadStream();
 
     void close() override;
@@ -19,7 +19,7 @@ public:
     
 
 private:
-    IStream *m_stream;
+    std::weak_ptr<IStream> m_stream;
     long m_startInStream;
     long m_endInStream;
     bool m_leaveOpen;

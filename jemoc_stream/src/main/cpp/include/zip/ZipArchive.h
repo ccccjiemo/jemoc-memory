@@ -6,11 +6,11 @@
 
 #ifndef JEMOC_STREAM_TEST_ZIPARCHIVE_H
 #define JEMOC_STREAM_TEST_ZIPARCHIVE_H
-#include <string>
-#include <napi/native_api.h>
 #include "IStream.h"
-#include <vector>
+#include <napi/native_api.h>
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 class ZipArchiveEntry;
 
@@ -18,7 +18,7 @@ enum ZipArchiveMode { ZipArchiveMode_Read, ZipArchiveMode_Update, ZipArchiveMode
 
 class ZipArchive {
 public:
-    ZipArchive(IStream *stream, const ZipArchiveMode mode, const std::string &password, bool leaveOpen);
+    ZipArchive(std::shared_ptr<IStream> stream, const ZipArchiveMode mode, const std::string &password, bool leaveOpen);
     ZipArchive(const std::string &path, const ZipArchiveMode mode, const std::string &password);
     ZipArchive(const int &fd, const long &offset, const long &length, const std::string &password);
     ~ZipArchive();
@@ -28,7 +28,7 @@ public:
     ZipArchiveEntry *createEntry(const std::string &entryName, int compressionLevel);
     ZipArchiveEntry *getEntry(const std::string &entryName);
     std::vector<ZipArchiveEntry *> getEntries();
-    IStream *getArchiveStream() { return m_stream; }
+    std::shared_ptr<IStream> &getArchiveStream() { return m_stream; }
     std::string getPassword() const { return m_passwd; }
     void close();
     bool isClosed() const { return m_close; }
@@ -56,6 +56,7 @@ public:
     static napi_ref cons;
     static ZipArchive *getZipArchive(napi_env env, napi_value value);
     static napi_value JSGetIsClosed(napi_env env, napi_callback_info info);
+    static napi_value JSGetEntryNames(napi_env env, napi_callback_info info);
 
 private:
     void readEndOfCentralDirectory();
@@ -66,11 +67,11 @@ private:
     void writeArchiveEpilogue(long startOfCentralDirectory, long sizeOfCentralDirectory);
 
 private:
-    IStream *m_stream = nullptr;
+    std::shared_ptr<IStream> m_stream = nullptr;
     const ZipArchiveMode m_mode;
     const std::string m_passwd;
     const bool m_leaveOpen;
-    IStream *m_backingStream = nullptr;
+    std::shared_ptr<IStream> m_backingStream = nullptr;
     std::vector<ZipArchiveEntry *> m_entries;
     std::unordered_map<std::string, ZipArchiveEntry *> m_entriesDictionary;
     bool m_readEntries = false;

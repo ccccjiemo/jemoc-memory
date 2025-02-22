@@ -5,18 +5,18 @@
 // please include "napi/native_api.h".
 #include "zip/ZipCryptoStream.h"
 #include "stream/MemoryStream.h"
-#include "zip/ZipArchiveEntry.h"
 #include "zip/ZipArchive.h"
+#include "zip/ZipArchiveEntry.h"
 #include <cstdint>
 
 
 std::string ZipCryptoStream::ClassName = "ZipCryptoStream";
 napi_ref ZipCryptoStream::cons = nullptr;
 
-ZipCryptoStream::ZipCryptoStream(IStream *stream, CryptoMode mode, const std::string &password, bool leaveOpen,
-                                 unsigned long crc, size_t bufferSize)
+ZipCryptoStream::ZipCryptoStream(std::shared_ptr<IStream> stream, CryptoMode mode, const std::string &password,
+                                 bool leaveOpen, unsigned long crc, size_t bufferSize)
     : m_stream(stream), m_mode(mode), m_password(password), m_leaveOpen(leaveOpen), m_crc(crc),
-      m_buffer_Size(bufferSize),m_everRead(false), m_everWrite(false) {
+      m_buffer_Size(bufferSize), m_everRead(false), m_everWrite(false) {
     m_canWrite = m_mode == CryptoMode::CryptoMode_Encode;
     m_canRead = m_mode == CryptoMode::CryptoMode_Decode;
     m_canSeek = false;
@@ -29,9 +29,10 @@ ZipCryptoStream::ZipCryptoStream(IStream *stream, CryptoMode mode, const std::st
     init_keys(m_password.c_str(), pkeys, zng_get_crc_table());
 }
 
-ZipCryptoStream::ZipCryptoStream(IStream *stream, CryptoMode mode, ZipArchiveEntry *entry, bool leaveOpen,
-                                 size_t bufferSize)
-    : m_stream(stream), m_mode(mode), m_entry(entry), m_leaveOpen(leaveOpen), m_buffer_Size(bufferSize),m_everRead(false), m_everWrite(false) {
+ZipCryptoStream::ZipCryptoStream(std::shared_ptr<IStream> stream, CryptoMode mode, ZipArchiveEntry *entry,
+                                 bool leaveOpen, size_t bufferSize)
+    : m_stream(stream), m_mode(mode), m_entry(entry), m_leaveOpen(leaveOpen), m_buffer_Size(bufferSize),
+      m_everRead(false), m_everWrite(false) {
     m_canWrite = m_mode == CryptoMode::CryptoMode_Encode;
     m_canRead = m_mode == CryptoMode::CryptoMode_Decode;
     m_canSeek = false;
@@ -176,7 +177,7 @@ void ZipCryptoStream::close() {
     IStream::close();
     if (!m_leaveOpen) {
         m_stream->close();
-        delete m_stream;
+        m_stream.reset();
     }
     m_stream = nullptr;
     if (m_buffer != nullptr) {
@@ -190,7 +191,7 @@ long ZipCryptoStream::getLength() const { throw std::ios::failure("ZipCryptoStre
 
 napi_value ZipCryptoStream::JSConstructor(napi_env env, napi_callback_info info) {
     GET_JS_INFO_WITHOUT_STREAM(5)
-    IStream *stream = getStream(env, argv[0]);
+    std::shared_ptr<IStream> stream = IStream::GetStream(env, argv[0]);
 
     if (stream == nullptr)
         napi_throw_error(env, "ZipCryptoStream", "argument stream is null");
@@ -205,9 +206,11 @@ napi_value ZipCryptoStream::JSConstructor(napi_env env, napi_callback_info info)
     GET_OBJ(argv[4], "leaveOpen", napi_get_value_bool, leaveOpen);
 
     try {
-        ZipCryptoStream *cryptoStream =
-            new ZipCryptoStream(stream, CryptoMode(mode), passwd, leaveOpen, crc, bufferSize);
-        if (napi_ok != napi_wrap(env, _this, cryptoStream, JSDispose, nullptr, nullptr))
+        std::shared_ptr<IStream> cryptoStream =
+            std::make_shared<ZipCryptoStream>(stream, CryptoMode(mode), passwd, leaveOpen, crc, bufferSize);
+//        ZipCryptoStream *cryptoStream =
+//            new ZipCryptoStream(stream, CryptoMode(mode), passwd, leaveOpen, crc, bufferSize);
+        if (napi_ok != napi_wrap(env, _this, new SharedPtrWrapper(cryptoStream), JSDispose, nullptr, nullptr))
             throw std::ios::failure("napi_wrap failed");
     } catch (const std::ios::failure &e) {
         napi_throw_error(env, "ZipCryptoStream", e.what());
@@ -218,8 +221,10 @@ napi_value ZipCryptoStream::JSConstructor(napi_env env, napi_callback_info info)
 }
 
 void ZipCryptoStream::JSDispose(napi_env env, void *data, void *hint) {
-    ZipCryptoStream *stream = static_cast<ZipCryptoStream *>(data);
-    stream->close();
+//    ZipCryptoStream *stream = static_cast<ZipCryptoStream *>(data);
+//    stream->close();
+    SharedPtrWrapper *wrapper = static_cast<SharedPtrWrapper *>(data);
+    delete wrapper;
 }
 
 void ZipCryptoStream::Export(napi_env env, napi_value exports) {

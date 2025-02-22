@@ -8,8 +8,8 @@
 
 std::string BrotliStream::ClassName = "BrotliStream";
 
-BrotliStream::BrotliStream(IStream *stream, CompressionMode compressionMode, const BrotliConfig &config, bool leaveOpen,
-                           size_t bufferSize)
+BrotliStream::BrotliStream(std::shared_ptr<IStream> stream, CompressionMode compressionMode, const BrotliConfig &config,
+                           bool leaveOpen, size_t bufferSize)
     : m_stream(stream), m_mode(compressionMode), m_decoder(nullptr), m_encoder(nullptr), m_leaveOpen(leaveOpen),
       bufferSize_(bufferSize) {
 
@@ -174,8 +174,8 @@ napi_value BrotliStream::JSConstructor(napi_env env, napi_callback_info info) {
     size_t argc = 3;
     napi_value argv[3]{nullptr};
     NAPI_CALL(env, napi_get_cb_info(env, info, &argc, argv, &_this, nullptr))
-    IStream *stream = getStream(env, argv[0]);
-    if (stream == nullptr) {
+    std::shared_ptr<IStream> stream = IStream::GetStream(env, argv[0]);
+    if (!stream) {
         napi_throw_type_error(env, "BrotliStream", "invalid stream");
         return nullptr;
     }
@@ -215,22 +215,22 @@ napi_value BrotliStream::JSConstructor(napi_env env, napi_callback_info info) {
         }
     }
     BrotliConfig config{.quality = quality, .lgWin = lgWin, .mode = b_mode};
-    BrotliStream *bs = new BrotliStream(stream, BrotliStream::CompressionMode(mode), config, leaveOpen, bufferSize);
-    NAPI_CALL(env, napi_create_reference(env, argv[0], 1, &bs->stream_ref))
+    std::shared_ptr<IStream> bs =
+        std::make_shared<BrotliStream>(stream, BrotliStream::CompressionMode(mode), config, leaveOpen, bufferSize);
 
-    NAPI_CALL(env, napi_wrap(env, _this, bs, JSDispose, nullptr, nullptr))
-    return _this;
+
+    return JSBind(env, _this, bs);
 }
 
-void BrotliStream::JSDispose(napi_env env, void *data, void *hint) {
-    BrotliStream *bs = static_cast<BrotliStream *>(data);
-    bs->close();
-    if (!bs->m_leaveOpen) {
-        napi_value result;
-        void *stream = nullptr;
-        ((IStream *)stream)->close();
-        NAPI_CALL(env, napi_get_reference_value(env, bs->stream_ref, &result))
-        NAPI_CALL(env, napi_remove_wrap(env, result, &stream))
-    }
-    delete bs;
-}
+// void BrotliStream::JSDispose(napi_env env, void *data, void *hint) {
+//     BrotliStream *bs = static_cast<BrotliStream *>(data);
+//     bs->close();
+//     if (!bs->m_leaveOpen) {
+//         napi_value result;
+//         void *stream = nullptr;
+//         ((IStream *)stream)->close();
+//         NAPI_CALL(env, napi_get_reference_value(env, bs->stream_ref, &result))
+//         NAPI_CALL(env, napi_remove_wrap(env, result, &stream))
+//     }
+//     delete bs;
+// }

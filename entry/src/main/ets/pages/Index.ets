@@ -2,6 +2,7 @@ import { base, compression, bufferpool } from '@jemoc/stream';
 import { fileIo, fileUri } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
 import image from '@ohos.multimedia.image';
+import { Disposeable } from './Disposeable';
 
 @Entry
 @Component
@@ -10,6 +11,26 @@ struct Index {
 
   build() {
     Column() {
+      Button('1.1.3').onClick(async () => {
+        // const ms = new base.MemoryStream();
+        // const ds = new compression.DeflateStream(ms, compression.DeflateStreamMode.Compress);
+        // ds.write(new Uint8Array([1, 2, 3, 4]));
+        // ds.close();
+        using(new base.MemoryStream(), (ms) => {
+          using(new compression.DeflateStream(ms, compression.DeflateStreamMode.Compress), (ds) => {
+            ds.write(new Uint8Array([1, 2, 3, 4]));
+          })
+        })
+
+        await using(new base.MemoryStream(), async (ms) => {
+          await using(new compression.DeflateStream(ms, compression.DeflateStreamMode.Compress, {leaveOpen: true}), async(ds) => {
+            ds.write(new Uint8Array([1, 2, 3, 4]));
+          })
+          const buffer = ms.toArrayBuffer();
+        })
+
+        console.log('finish');
+      })
       Button('test brotliStream').onClick(async () => {
 
         try {
@@ -97,6 +118,9 @@ struct Index {
             await fileIo.write(file.fd, b1);
             await fileIo.close(file);
             ms.close();
+            zip.close();
+            const isClosed = fs.isClosed;
+            console.log('finish');
           } catch (e) {
             console.log(e);
           }
@@ -146,3 +170,35 @@ struct Index {
   }
 }
 
+
+// 重载声明
+function using<T extends Disposeable>(
+  target: T,
+  callback: (target: T) => Promise<void>
+): Promise<void>;
+
+function using<T extends Disposeable>(
+  target: T,
+  callback: (target: T) => void
+): void;
+
+function using<T extends Disposeable>(
+  target: T,
+  callback: (target: T) => void | Promise<void>
+): void | Promise<void> {
+  const result = callback(target);
+
+  if (result instanceof Promise) {
+    // 处理异步回调
+    return result.finally(async () => {
+      await target.closeAsync();
+    });
+  } else {
+    // 处理同步回调
+    try {
+      return result;
+    } finally {
+      target.close();
+    }
+  }
+}

@@ -351,6 +351,8 @@ export class ZipArchive {
   createEntry(entryName: string, compressionLevel?: number): ZipArchiveEntry
 
   close(): void
+
+  get entryNames(): string[]
 }
 
 

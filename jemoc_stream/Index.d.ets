@@ -860,6 +860,8 @@ declare namespace compression {
      */
     createEntry(entryName: string, compressionLevel?: number): ZipArchiveEntry
 
+    get entryNames(): string[]
+
     get isClosed(): boolean
 
     /**

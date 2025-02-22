@@ -126,31 +126,32 @@ napi_value MemoryStream::JSConstructor(napi_env env, napi_callback_info info) {
     GET_JS_INFO_WITHOUT_STREAM(1);
     napi_valuetype type;
     NAPI_CALL(env, napi_typeof(env, argv[0], &type))
-    MemoryStream *stream = new MemoryStream();
+//    MemoryStream *stream = new MemoryStream();
+    std::shared_ptr<IStream> stream = std::make_shared<MemoryStream>();
     if (type != napi_undefined) {
         if (type == napi_number) {
             long capacity = getLong(env, argv[0]);
-            stream->setCapacity(capacity);
+            ((MemoryStream *)stream.get())->setCapacity(capacity);
+            stream = std::make_shared<MemoryStream>(capacity);
         } else {
             void *data = nullptr;
             size_t length = 0;
             getBuffer(env, argv[0], &data, &length);
             if (data != nullptr) {
-                stream->setCapacity(length);
                 stream->write(data, 0, length);
             }
         }
     }
-
-    napi_wrap(env, _this, stream, JSDisposed, nullptr, nullptr);
-    return _this;
+//    napi_wrap(env, _this, MakePtr(stream), JSDisposed, nullptr, nullptr);
+//    return _this;
+    return JSBind(env, _this, stream);
 }
 
-void MemoryStream::JSDisposed(napi_env env, void *data, void *hint) {
-    MemoryStream *stream = static_cast<MemoryStream *>(data);
-    stream->close();
-    delete stream;
-}
+//void MemoryStream::JSDisposed(napi_env env, void *data, void *hint) {
+//    MemoryStream *stream = static_cast<MemoryStream *>(data);
+//    stream->close();
+//    delete stream;
+//}
 
 napi_value MemoryStream::JSToArrayBuffer(napi_env env, napi_callback_info info) {
     GET_JS_INFO(1)
@@ -162,14 +163,14 @@ napi_value MemoryStream::JSToArrayBuffer(napi_env env, napi_callback_info info) 
         getToArrayBufferOptions(env, argv[0], &offset, &length);
     }
     NAPI_CALL(env, napi_create_arraybuffer(env, length, &data, &buffer));
-    
-    memcpy(data, ((MemoryStream *)stream)->getData() + offset, length);
+
+    memcpy(data, ((MemoryStream *)stream.get())->getData() + offset, length);
     return buffer;
 }
 
 napi_value MemoryStream::JSGetCapacity(napi_env env, napi_callback_info info) {
     GET_JS_INFO(0)
-    RETURN_NAPI_VALUE(napi_create_int64, static_cast<MemoryStream *>(stream)->getCapacity());
+    RETURN_NAPI_VALUE(napi_create_int64, static_cast<MemoryStream *>(stream.get())->getCapacity());
 }
 napi_value MemoryStream::JSSetCapacity(napi_env env, napi_callback_info info) {
     GET_JS_INFO(1)
@@ -177,21 +178,22 @@ napi_value MemoryStream::JSSetCapacity(napi_env env, napi_callback_info info) {
     if (capacity < 0 || capacity < stream->getPosition()) {
         napi_throw_range_error(env, "MemoryStream::setCapacity", "capacity is out of range");
     }
-    static_cast<MemoryStream *>(stream)->setCapacity(capacity);
+    static_cast<MemoryStream *>(stream.get())->setCapacity(capacity);
     return nullptr;
 }
 
 
 void MemoryStream::Export(napi_env env, napi_value exports) {
     napi_property_descriptor desc[] = {
-        DEFINE_NAPI_ISTREAM_PROPERTY((void *)ClassName.c_str()),
+//        DEFINE_NAPI_ISTREAM_PROPERTY((void *)ClassName.c_str()),
         DEFINE_NAPI_FUNCTION("capacity", nullptr, JSGetCapacity, JSSetCapacity, nullptr),
         DEFINE_NAPI_FUNCTION("toArrayBuffer", JSToArrayBuffer, nullptr, nullptr, nullptr),
     };
     napi_value napi_cons = nullptr;
     napi_define_class(env, ClassName.c_str(), NAPI_AUTO_LENGTH, JSConstructor, nullptr, sizeof(desc) / sizeof(desc[0]),
                       desc, &napi_cons);
-    napi_create_reference(env, napi_cons, 1, &cons);
+//    napi_create_reference(env, napi_cons, 1, &cons);
+    Extends(env, napi_cons);
 
     napi_set_named_property(env, exports, ClassName.c_str(), napi_cons);
 }

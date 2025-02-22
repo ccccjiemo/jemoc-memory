@@ -7,13 +7,12 @@
 #include "zip/ZipArchiveEntry.h"
 #include "stream/DeflateStream.h"
 #include "stream/SubReadStream.h"
+#include "zip/CheckSumAndSizeWriteStream.h"
 #include "zip/DirectToArchiveWriterStream.h"
 #include "zip/WrappedStream.h"
 #include "zip/ZipArchive.h"
-#include "zip/ZipRecord.h"
 #include "zip/ZipCryptoStream.h"
-#include "stream/DeflateStream.h"
-#include "zip/CheckSumAndSizeWriteStream.h"
+#include "zip/ZipRecord.h"
 
 
 static ushort mapCompressionLevel(ushort flag, ushort compressionMethod) {
@@ -82,7 +81,7 @@ ZipArchiveEntry::ZipArchiveEntry(ZipArchive *archive, const ZipCentralDirectoryR
     }
     if (flags & GeneralPurposeBitFlag_DataDescriptor) {
         ZipDataDescriptor descriptor;
-        if (ZipDataDescriptor::tryRead(archive->getArchiveStream(), &descriptor)) {
+        if (ZipDataDescriptor::tryRead(archive->getArchiveStream().get(), &descriptor)) {
             crc = descriptor.crc;
             compressedSize = descriptor.compressedSize;
             uncompressedSize = descriptor.uncompressedSize;
@@ -137,12 +136,14 @@ ZipArchiveEntry::~ZipArchiveEntry() {
     }
     if (compressedBytes != nullptr) {
         compressedBytes->close();
-        delete compressedBytes;
+//        delete compressedBytes;
+        compressedBytes.reset();
         compressedBytes = nullptr;
     }
     if (uncompressedData != nullptr) {
         uncompressedData->close();
-        delete uncompressedData;
+//        delete uncompressedData;
+        uncompressedData.reset();
         uncompressedData = nullptr;
     }
     if (cdExtraFields != nullptr) {
@@ -207,7 +208,7 @@ std::string ZipArchiveEntry::getFullName() {
 
 long ZipArchiveEntry::getOffsetOfCompressedData() {
     if (stored_offsetOfCompressedData == -1) {
-        IStream *stream = m_archive->getArchiveStream();
+        IStream *stream = m_archive->getArchiveStream().get();
         stream->seek(headerOffset, SeekOrigin::Begin);
         if (!ZipLocalFileHeader::trySkip(stream))
             throw std::ios::failure("a local file header is corrupt.");
@@ -218,7 +219,7 @@ long ZipArchiveEntry::getOffsetOfCompressedData() {
 }
 
 
-IStream *ZipArchiveEntry::open() {
+std::shared_ptr<IStream> ZipArchiveEntry::open() {
     switch (m_archive->getMode()) {
     case ZipArchiveMode_Read:
         return openInReadMode();
@@ -248,33 +249,38 @@ void ZipArchiveEntry::setFullName(const std::string &entryName) {
     memcpy(fileName, m_stored_fullname.c_str(), fileNameLength);
 }
 
-IStream *ZipArchiveEntry::openInReadMode() {
-    IStream *stream =
-        new SubReadStream(m_archive->getArchiveStream(), getOffsetOfCompressedData(), compressedSize, true);
+std::shared_ptr<IStream> ZipArchiveEntry::openInReadMode() {
+//    IStream *stream =
+//        new SubReadStream(m_archive->getArchiveStream(), getOffsetOfCompressedData(), compressedSize, true);
+    std::shared_ptr<IStream> stream = std::make_shared<SubReadStream>(
+         m_archive->getArchiveStream(), getOffsetOfCompressedData(), compressedSize, true);
     if (getIsEncrypted()) {
-        stream = new ZipCryptoStream(stream, CryptoMode_Decode, this, false);
+        stream = std::make_shared<ZipCryptoStream>(stream, CryptoMode_Decode, this, false);
+//        stream = new ZipCryptoStream(stream, CryptoMode_Decode, this, false);
 //         stream = new ZipCryptoStream(stream, CryptoMode_Decode, m_archive->getPassword(), false, crc);
     }
     return getDataDecompressor(stream);
 }
 
-IStream *ZipArchiveEntry::openInUpdateMode() {
+std::shared_ptr<IStream> ZipArchiveEntry::openInUpdateMode() {
     if (m_currentlyOpenForWrite)
         throw std::ios::failure("entries cannot be opened multiple times in update mode.");
     m_everOpenedForWrite = true;
     m_currentlyOpenForWrite = true;
-    IStream *stream = getUncompressedData();
+    auto stream = getUncompressedData();
     stream->seek(0, SeekOrigin::Begin);
-    return new WrappedStream(stream, this, true, [this]() { this->m_currentlyOpenForWrite = false; });
+    return std::make_shared<WrappedStream>(stream, this, true, [this]() { this->m_currentlyOpenForWrite = false; });
+//    return new WrappedStream(stream, this, true, [this]() { this->m_currentlyOpenForWrite = false; });
 }
 
-IStream *ZipArchiveEntry::getUncompressedData() {
+std::shared_ptr<IStream> ZipArchiveEntry::getUncompressedData() {
     if (uncompressedData == nullptr) {
-        uncompressedData = new MemoryStream(uncompressedSize);
+//        uncompressedData = new MemoryStream(uncompressedSize);
+        uncompressedData = std::make_shared<MemoryStream>(uncompressedSize);
         if (m_originallyInArchive) {
             try {
-                IStream *stream = openInReadMode();
-                stream->copyTo(uncompressedData, 8192);
+                std::shared_ptr<IStream> stream = openInReadMode();
+                stream->copyTo(uncompressedData.get(), 8192);
                 stream->close();
             } catch (const std::exception &e) {
                 uncompressedData->close();
@@ -289,23 +295,28 @@ IStream *ZipArchiveEntry::getUncompressedData() {
 }
 
 
-IStream *ZipArchiveEntry::getDataDecompressor(IStream *stream) {
-    IStream *decompressor = stream;
+std::shared_ptr<IStream> ZipArchiveEntry::getDataDecompressor(std::shared_ptr<IStream> stream) {
+//    IStream *decompressor = stream;
+    std::shared_ptr<IStream> decompressor = stream;
     if (compressionMethod == CompressionMethod::Deflate || compressionMethod == CompressionMethod::Deflate64) {
-        decompressor =
-            new DeflateStream(stream, DeflateMode_Decompress, -15, m_compression_level, false, 8192, uncompressedSize);
+//        decompressor = new DeflateStream(std::shared_ptr<IStream>(stream), DeflateMode_Decompress, -15,
+//                                         m_compression_level, false, 8192, uncompressedSize);
+        decompressor = std::make_shared<DeflateStream>(stream, DeflateMode_Decompress, -15, m_compression_level, false,
+                                                       8192, uncompressedSize);
     }
 
     return decompressor;
 }
 
-IStream *ZipArchiveEntry::getDataCompressor(IStream *stream, bool leaveOpen) {
-    IStream *compressorStream = stream;
-    ZipCryptoStream *cryptoStream = nullptr;
+std::shared_ptr<IStream> ZipArchiveEntry::getDataCompressor(std::shared_ptr<IStream> stream, bool leaveOpen) {
+    std::shared_ptr<IStream> compressorStream = stream;
+    bool isZipCrypto = false;
     bool isBase = true;
     if (getIsEncrypted()) {
-        cryptoStream = new ZipCryptoStream(stream, CryptoMode_Encode, this, leaveOpen);
-        compressorStream = cryptoStream;
+        compressorStream = std::make_shared<ZipCryptoStream>(stream, CryptoMode_Encode, this, leaveOpen);
+//        cryptoStream = new ZipCryptoStream(stream, CryptoMode_Encode, this, leaveOpen);
+//        compressorStream = cryptoStream;
+        isZipCrypto = true;
         isBase = false;
     }
     switch (compressionMethod) {
@@ -314,33 +325,44 @@ IStream *ZipArchiveEntry::getDataCompressor(IStream *stream, bool leaveOpen) {
     case CompressionMethod::Deflate:
     case CompressionMethod::Deflate64:
     default:
-        compressorStream =
-            new DeflateStream(compressorStream, DeflateMode_Compress, -15,
-                              getZlibCompressionLevel(getCompressionLevel()), isBase ? leaveOpen && true : false);
+        compressorStream = std::make_shared<DeflateStream>(compressorStream, DeflateMode_Compress, -15,
+                                                           getZlibCompressionLevel(getCompressionLevel()),
+                                                           isBase ? leaveOpen && true : false);
+//            new DeflateStream(compressorStream, DeflateMode_Compress, -15,
+//                              getZlibCompressionLevel(getCompressionLevel()), isBase ? leaveOpen && true :
+        //                              false);
         isBase = false;
         break;
     }
 
-    CheckSumAndSizeWriteStream *checkSumStream =
-        new CheckSumAndSizeWriteStream(compressorStream, stream, isBase ? leaveOpen && true : false,
-                                       [this](long initialPosition, long currentPosition, uint checkSum) {
-                                           crc = checkSum;
-                                           uncompressedSize = currentPosition;
-                                           compressedSize =
-                                               m_archive->getArchiveStream()->getPosition() - initialPosition;
-                                       });
-
-    return checkSumStream;
+    return std::make_shared<CheckSumAndSizeWriteStream>(
+        compressorStream, stream, isBase ? leaveOpen && true : false,
+        [this](long initialPosition, long currentPosition, uint checkSum) {
+            crc = checkSum;
+            uncompressedSize = currentPosition;
+            compressedSize = m_archive->getArchiveStream()->getPosition() - initialPosition;
+        });
+//    CheckSumAndSizeWriteStream *checkSumStream =
+//        new CheckSumAndSizeWriteStream(compressorStream, stream, isBase ? leaveOpen && true : false,
+//                                       [this](long initialPosition, long currentPosition, uint checkSum) {
+//                                           crc = checkSum;
+//                                           uncompressedSize = currentPosition;
+//                                           compressedSize =
+//                                               m_archive->getArchiveStream()->getPosition() - initialPosition;
+//                                       });
+//
+//    return checkSumStream;
 }
 
-IStream *ZipArchiveEntry::openInCreateMode() {
+std::shared_ptr<IStream> ZipArchiveEntry::openInCreateMode() {
     if (m_everOpenedForWrite)
         throw std::ios::failure(
             "entries in create mode may only be written to once, and only one entry may be held open at a time.");
     m_everOpenedForWrite = true;
-    CheckSumAndSizeWriteStream *crcStream =
-        (CheckSumAndSizeWriteStream *)getDataCompressor(m_archive->getArchiveStream(), true);
-    return new DirectToArchiveWriterStream(crcStream, this);
+//    CheckSumAndSizeWriteStream *crcStream =
+//        (CheckSumAndSizeWriteStream *)getDataCompressor(m_archive->getArchiveStream(), true);
+//    return new DirectToArchiveWriterStream(crcStream, this);
+    return std::make_shared<DirectToArchiveWriterStream>(getDataCompressor(m_archive->getArchiveStream(), true), this);
 }
 
 CompressionMethod ZipArchiveEntry::getCompressionMethod() const { return CompressionMethod(compressionMethod); }
@@ -358,7 +380,7 @@ bool ZipArchiveEntry::writeLocalFileHeader() {
     header.uncompressedSize = uncompressedSize;
     header.fileNameLength = fileNameLength;
     header.extraFieldLength = lfExtraFieldsLength;
-    IStream *stream = m_archive->getArchiveStream();
+    IStream *stream = m_archive->getArchiveStream().get();
     stream->write(&header, 0, sizeof(header));
     stream->write(fileName, 0, fileNameLength);
     if (lfExtraFieldsLength > 0) {
@@ -369,7 +391,7 @@ bool ZipArchiveEntry::writeLocalFileHeader() {
 
 void ZipArchiveEntry::writeCrcAndSizesInLocalHeader() {
     long finalPosition = m_archive->getArchiveStream()->getPosition();
-    IStream *stream = m_archive->getArchiveStream();
+    IStream *stream = m_archive->getArchiveStream().get();
     stream->seek(headerOffset + ZIP_LOCALFILEHEADER_OFFSET_TO_CRC, SeekOrigin::Begin);
     stream->write(&crc, 0, sizeof(crc));
     stream->write(&compressedSize, 0, sizeof(compressedSize));
@@ -378,7 +400,7 @@ void ZipArchiveEntry::writeCrcAndSizesInLocalHeader() {
 }
 
 void ZipArchiveEntry::writeDataDescriptor() {
-    IStream *stream = m_archive->getArchiveStream();
+    IStream *stream = m_archive->getArchiveStream().get();
     stream->write(&crc, 0, sizeof(crc));
     stream->write(&compressedSize, 0, sizeof(compressedSize));
     stream->write(&uncompressedSize, 0, sizeof(uncompressedSize));
@@ -389,12 +411,14 @@ void ZipArchiveEntry::writeAndFinishLocalEntry() {
     writeLocalFileHeaderAndDataIfNeeded();
     if (uncompressedData != nullptr) {
         uncompressedData->close();
-        delete uncompressedData;
+//        delete uncompressedData;
+        uncompressedData.reset();
         uncompressedData = nullptr;
     }
     if (compressedBytes != nullptr) {
         compressedBytes->close();
-        delete compressedBytes;
+//        delete compressedBytes;
+        compressedBytes.reset();
         compressedBytes = nullptr;
     }
 }
@@ -424,7 +448,8 @@ void ZipArchiveEntry::writeLocalFileHeaderAndDataIfNeeded() {
         if (uncompressedSize != 0) {
             m_archive->getArchiveStream()->write((void *)compressedBytes->getData(), 0, compressedBytes->getLength());
             compressedBytes->close();
-            delete compressedBytes;
+            compressedBytes.reset();
+//            delete compressedBytes;
             compressedBytes = nullptr;
         }
     }
@@ -449,9 +474,10 @@ void ZipArchiveEntry::loadLocalHeaderExtraFieldAndCompressedBytesIfNeeded() {
     if (!m_everOpenedForWrite && m_originallyInArchive) {
         if (compressedBytes != nullptr) {
             compressedBytes->close();
-            delete compressedBytes;
+//            delete compressedBytes;
+            compressedBytes.reset();
         }
-        compressedBytes = new MemoryStream(compressedSize);
+        compressedBytes = std::make_shared<MemoryStream>(compressedSize) ;
         SubReadStream *subRead =
             new SubReadStream(m_archive->getArchiveStream(), getOffsetOfCompressedData(), compressedSize, true);
         char *buffer = new char[8192];
@@ -484,7 +510,7 @@ void ZipArchiveEntry::writeCentralDirectoryFileHeader() {
     record.internalAttributes = 0;
     record.externalAttributes = externalFileAttr;
     record.headerOffset = headerOffset;
-    IStream *stream = m_archive->getArchiveStream();
+    IStream *stream = m_archive->getArchiveStream().get();
     stream->write(&record, 0, sizeof(record));
     stream->write(fileName, 0, fileNameLength);
     if (extraFieldLength > 0) {
@@ -573,8 +599,8 @@ void ZipArchiveEntry::JSDispose(napi_env env, void *data, void *hint) {
 }
 
 napi_value ZipArchiveEntry::open(napi_env env) {
-    IStream *stream = open();
-    openingStream = stream;
+    std::shared_ptr<IStream> stream = open();
+//    openingStream = stream;
     napi_value result = IStream::JSCreateInterface(env, stream);
 //     NAPI_CALL(env, napi_create_reference(env, result, 1, &jsOpeningStream))
     return result;

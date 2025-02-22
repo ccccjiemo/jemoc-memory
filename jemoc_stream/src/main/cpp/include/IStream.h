@@ -55,7 +55,7 @@ static void getToArrayBufferOptions(napi_env env, napi_value value, long *offset
 
 #define GET_JS_INFO_WITHOUT_CHECK(count)                                                                               \
     GET_JS_INFO_WITHOUT_STREAM(count)                                                                                  \
-    IStream *stream = getStream(env, _this);
+    std::shared_ptr<IStream> stream = IStream::GetStream(env, _this);
 
 
 #define GET_JS_INFO_WITHOUT_STREAM(count)                                                                              \
@@ -68,12 +68,12 @@ static void getToArrayBufferOptions(napi_env env, napi_value value, long *offset
 
 #define GET_JS_INFO(count)                                                                                             \
     GET_JS_INFO_WITHOUT_STREAM(count)                                                                                  \
-    IStream *stream = getStream(env, _this);                                                                           \
+    std::shared_ptr<IStream> stream = IStream::GetStream(env, _this);                                                  \
     if (stream == nullptr) {                                                                                           \
-        napi_throw_error(env, tagName, "stream is null");                                                              \
+        napi_throw_error(env, ClassName.c_str(), "stream is null");                                                    \
     }                                                                                                                  \
     if (stream->isClose()) {                                                                                           \
-        napi_throw_error(env, tagName, "stream is closed");                                                            \
+        napi_throw_error(env, ClassName.c_str(), "stream is closed");                                                  \
     }
 
 #define RETURN_NAPI_VALUE(func, value)                                                                                 \
@@ -157,6 +157,13 @@ enum SeekOrigin { Begin, Current, End };
 
 class IStream {
 public:
+    struct SharedPtrWrapper {
+        std::shared_ptr<IStream> ptr;
+        ~SharedPtrWrapper() { ptr = nullptr; }
+        SharedPtrWrapper(std::shared_ptr<IStream> p) : ptr(p){};
+    };
+
+public:
     static napi_value JSGetCanRead(napi_env env, napi_callback_info info);
     static napi_value JSGetCanWrite(napi_env env, napi_callback_info info);
     static napi_value JSGetCanSeek(napi_env env, napi_callback_info info);
@@ -175,10 +182,14 @@ public:
     static napi_value JSFlushAsync(napi_env env, napi_callback_info info);
     static napi_value JSCloseAsync(napi_env env, napi_callback_info info);
     static napi_value JSGetIsClosed(napi_env env, napi_callback_info info);
-    static napi_value JSCreateInterface(napi_env env, IStream *stream);
+    static napi_value JSCreateInterface(napi_env env, std::shared_ptr<IStream> stream);
+    static napi_value JSBind(napi_env env, napi_value value, std::shared_ptr<IStream> stream);
+
 
     static void Export(napi_env env, napi_value exports);
     static void Extends(napi_env env, napi_value constructor);
+    static SharedPtrWrapper *MakePtr(IStream *stream);
+    static std::shared_ptr<IStream> GetStream(napi_env env, napi_value value);
     static std::string ClassName;
     static napi_value cons;
 
@@ -186,6 +197,7 @@ public:
     IStream()
         : m_canRead(false), m_canWrite(false), m_canSeek(false), m_position(0), m_length(0), m_canGetLength(false),
           m_canGetPosition(false), m_closed(false) {}
+    virtual ~IStream() = default;
     virtual bool getCanRead() const { return m_canRead; }
     virtual bool getCanWrite() const { return m_canWrite; }
     virtual bool getCanSeek() const { return m_canSeek; }
@@ -199,6 +211,8 @@ public:
     virtual long read(void *buffer, long offset, size_t count) { return 0; };
     virtual long write(void *buffer, long offset, size_t count) { return 0; };
     virtual bool isClose() const { return m_closed; }
+    virtual void close(napi_env env) { close(); }
+
 
 protected:
     bool m_canRead;
