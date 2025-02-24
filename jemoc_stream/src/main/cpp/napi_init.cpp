@@ -1,4 +1,8 @@
 #include "BufferPool.h"
+#include "JSBinding.h"
+#include "binding/StreamReaderBinding.h"
+#include "binding/TextReaderBinding.h"
+#include "binding/XmlReaderBinding.h"
 #include "napi/native_api.h"
 #include "stream/BrotliStream.h"
 #include "stream/DeflateStream.h"
@@ -26,6 +30,11 @@ static napi_value Init(napi_env env, napi_value exports) {
     BrotliJs::Export(env, exports);
     jemoc_stream::BufferPool::Export(env, exports);
     jemoc_stream::LruBufferPool::Export(env, exports);
+
+    TextReaderBinding::Init(env, exports);
+    StreamReaderBinding::Init(env, exports);
+    XmlReaderBinding::Init(env, exports);
+
     return exports;
 }
 EXTERN_C_END

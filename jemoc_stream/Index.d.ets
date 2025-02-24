@@ -7,6 +7,23 @@ export type BufferLike = ArrayBufferLike | Uint8Array;
 
 declare namespace base {
 
+  export interface Closable {
+    close(): void;
+
+    closeAsync(): Promise<void>
+  }
+
+  export function using<T extends Closable>(
+    target: T,
+    callback: (target: T) => Promise<void>
+  ): Promise<void>;
+
+  export function using<T extends Closable>(
+    target: T,
+    callback: (target: T) => void
+  ): void;
+
+
   /**
    * @since 1.1.2
    */
@@ -1011,4 +1028,73 @@ declare namespace streamUtils {
    * @returns
    */
   export function createMultiWritable(...stream: base.IStream[]): stream.Writable
+}
+
+declare namespace reader {
+  export abstract class TextReader {
+    abstract read(buffer?: ArrayBuffer): number;
+
+    abstract readLine(): string;
+  }
+
+  export interface StreamReaderOptions {
+    detectEncodingFromByteOrderMarks?: boolean;
+    encoding?: string;
+    leaveOpen?: boolean
+  }
+
+  export class StreamReader extends TextReader {
+    constructor(target: string | base.IStream, options?: StreamReaderOptions)
+
+    readToEnd(): string;
+
+    skip(count: number): number;
+
+    peek(): number;
+
+    close: void;
+
+    read(buffer?: ArrayBuffer | undefined): number;
+
+    readLine(): string;
+
+    get encoding(): string;
+
+    get endOfStream(): boolean;
+  }
+
+  export class XmlReader {
+    constructor(target: string | TextReader)
+
+    read(): boolean;
+
+    get name(): string;
+
+    get value(): string;
+
+    get nodeType(): XmlNodeType;
+
+    getAttribute(attribute: string): string;
+
+    get attributes(): Record<string, string>
+
+    get isEmptyElement(): boolean;
+
+    close(): void;
+  }
+
+  export enum XmlNodeType {
+    None,
+    Element,
+    Attribute,
+    Text,
+    CDATA,
+    Comment,
+    Document,
+    EndElement,
+    XmlDeclaration,
+    DocumentType,
+    ProcessingInstruction,
+    Whitespace
+  }
 }

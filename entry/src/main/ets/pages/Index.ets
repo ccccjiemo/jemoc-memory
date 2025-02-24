@@ -1,4 +1,4 @@
-import { base, compression, bufferpool } from '@jemoc/stream';
+import { base, compression, bufferpool, reader } from '@jemoc/stream';
 import { fileIo, fileUri } from '@kit.CoreFileKit';
 import { util } from '@kit.ArkTS';
 import image from '@ohos.multimedia.image';
@@ -12,22 +12,33 @@ struct Index {
   build() {
     Column() {
       Button('1.1.3').onClick(async () => {
-        // const ms = new base.MemoryStream();
-        // const ds = new compression.DeflateStream(ms, compression.DeflateStreamMode.Compress);
-        // ds.write(new Uint8Array([1, 2, 3, 4]));
-        // ds.close();
-        using(new base.MemoryStream(), (ms) => {
-          using(new compression.DeflateStream(ms, compression.DeflateStreamMode.Compress), (ds) => {
-            ds.write(new Uint8Array([1, 2, 3, 4]));
-          })
-        })
 
-        await using(new base.MemoryStream(), async (ms) => {
-          await using(new compression.DeflateStream(ms, compression.DeflateStreamMode.Compress, {leaveOpen: true}), async(ds) => {
-            ds.write(new Uint8Array([1, 2, 3, 4]));
-          })
-          const buffer = ms.toArrayBuffer();
-        })
+        // base.using(new base.MemoryStream(), (ms) => {
+        //   ms.write(util.TextEncoder.create()
+        //     .encodeInto("hello world! this is a stream reader test; 这是StreamReader测试;!"));
+        //
+        //   })
+        // })
+
+
+        const ms = new base.MemoryStream();
+        ms.write(util.TextEncoder.create()
+          .encodeInto("hello world! this is a stream reader test; 这是StreamReader测试;!"));
+        ms.seek(0, base.SeekOrigin.Begin);
+        const r1 = new reader.StreamReader(ms, { detectEncodingFromByteOrderMarks: false, encoding: 'utf-8' });
+
+        const result = r1.readToEnd();
+
+        const xmlReader = new reader.XmlReader(`<?xml version="1.0" encoding="utf-8" ?>
+        <root>
+          <cat color="white">I'm a Cat</cat>
+          <dog color="yellow"/>
+          </root>`);
+
+        while (xmlReader.read()) {
+          console.log(`${xmlReader.nodeType}`)
+        }
+
 
         console.log('finish');
       })

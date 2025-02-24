@@ -475,3 +475,37 @@ export class BrotliUtils {
 
   static decompressAsync(buffer: BufferLike | string): Promise<ArrayBuffer>
 }
+
+export abstract class TextReader {
+  abstract read(buffer?: ArrayBuffer): number;
+
+  abstract readLine(): string;
+
+  abstract readToEnd(): string;
+
+  abstract skip(count: number): number;
+
+  abstract peek(): number;
+
+  abstract close: void;
+}
+
+export class StreamReader extends TextReader {
+  constructor(target: string | IStream, { detectEncodingFromByteOrderMarks: boolean, encoding: string })
+
+  readToEnd(): string;
+
+  skip(count: number): number;
+
+  peek(): number;
+
+  close: void;
+
+  read(buffer?: ArrayBuffer | undefined): number;
+
+  readLine(): string;
+
+  get encoding(): string;
+}
+
+export class XmlReader {}
