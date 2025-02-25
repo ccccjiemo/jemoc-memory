@@ -1,5 +1,4 @@
 #include "BufferPool.h"
-#include "JSBinding.h"
 #include "binding/StreamReaderBinding.h"
 #include "binding/TextReaderBinding.h"
 #include "binding/XmlReaderBinding.h"
@@ -33,6 +32,9 @@ static napi_value Init(napi_env env, napi_value exports) {
 
     TextReaderBinding::Init(env, exports);
     StreamReaderBinding::Init(env, exports);
+    
+
+
     XmlReaderBinding::Init(env, exports);
 
     return exports;

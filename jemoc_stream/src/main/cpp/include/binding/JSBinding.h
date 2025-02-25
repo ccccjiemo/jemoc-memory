@@ -7,119 +7,20 @@
 #ifndef JEMOC_STREAM_TEST_JSBINDING_H
 #define JEMOC_STREAM_TEST_JSBINDING_H
 
-#include "InstancePolicy.h"
-#include "common.h"
+#include "StoragePolicy.h"
 #include "napi/native_api.h"
+#include "traits_check.h"
 #include <map>
+#include <mutex>
+#include <string>
 #include <type_traits>
-
-namespace traits_check {
-// GetClassName 检查
-template <typename, typename = void> struct HasGetClassName : std::false_type {};
-
-template <typename T>
-struct HasGetClassName<T, std::void_t<decltype(T::GetClassName())>>
-    : std::is_convertible<decltype(T::GetClassName()), std::string> {};
-
-// ConstructInstance 检查
-template <typename, typename = void> struct HasConstructInstance : std::false_type {};
-
-template <typename T>
-struct HasConstructInstance<T, std::void_t<decltype(T::ConstructInstance(
-                                   std::declval<napi_env>(), std::declval<size_t>(), std::declval<napi_value *>()))>>
-    : std::true_type {};
-
-// GetMethods 检查
-template <typename, typename = void> struct HasGetMethods : std::false_type {};
-
-template <typename T>
-struct HasGetMethods<T, std::void_t<decltype(T::GetMethods())>>
-    : std::is_convertible<decltype(T::GetMethods()), std::vector<napi_property_descriptor>> {};
-
-// 综合检查器
-template <typename T> struct ValidateTraits {
-    static constexpr bool value =
-        HasGetClassName<T>::value && HasConstructInstance<T>::value && HasGetMethods<T>::value;
-
-    static_assert(HasGetClassName<T>::value, "Traits must implement static std::string GetClassName()");
-    static_assert(HasConstructInstance<T>::value,
-                  "Traits must implement static InstanceType ConstructInstance(napi_env, size_t, napi_value*)");
-    static_assert(HasGetMethods<T>::value,
-                  "Traits must implement static std::vector<napi_property_descriptor> GetMethods()");
-};
-} // namespace traits_check
-
-
-/**
- * @brief DefaultJSBindingTraits 是一个模板类，用于定义 JavaScript 绑定的默认行为。
- *
- * 用户需要继承此模板并提供特定类型的实现。以下是对该模板的详细说明：
- *
- * ### 必须实现的方法
- * - **static std::string GetClassName()**
- *   返回绑定类的名称。此方法没有默认实现，用户必须提供具体实现。
- *
- * ### 可选方法（已提供默认实现）
- * 以下方法已经提供了默认实现，但用户可以根据需要重写它们：
- *
- * - **static InstanceType ConstructInstance(napi_env env, size_t argc, napi_value *argv)**
- *   构造绑定类的实例。默认返回 `nullptr`，表示不支持构造实例。
- *
- * - **static std::string GetParentName()**
- *   返回父类的名称。默认返回空字符串，表示没有父类。
- *
- * - **static bool IsAbstractClass()**
- *   判断当前类是否为抽象类。默认返回 `false`。
- *
- * - **static std::vector<napi_property_descriptor> GetMethods()**
- *   返回绑定类的方法列表。默认返回空列表，表示没有方法。
- *
- * - **static void RemoveWrapper(napi_env env, NapiWrapperType *wrapper)**
- *   移除与实例关联的包装器时调用的方法，用于销毁前的额外操作，比如数据保存。默认实现为空操作。
- *
- * - **template <typename E = ExtraData> static auto CreateExtraData(napi_env env, const InstanceType &instance)**
- *   创建额外数据（ExtraData）。如果 `ExtraData` 不是 `void` 类型，则默认返回其默认构造的对象。
- *
- * ### 使用方式
- * 用户需要通过继承 `DefaultJSBindingTraits` 并指定 `Derived` 类型来使用此模板。例如：
- *
- * ```cpp
- * struct MyBindingTraits : public DefaultJSBindingTraits<MyBindingTraits> {
- *     static std::string GetClassName() { return "MyClass"; }
- * };
- * ```
- */
-template <typename Derived> struct DefaultJSBindingTraits {
-    using JSBindingType = typename Derived::JSBindingType;
-    using T = typename JSBindingType::NativeType;
-    using StoragePolicy = typename JSBindingType::StoragePolicyType;
-    using InstanceType = typename StoragePolicy::InstanceType;
-    using ExtraData = typename JSBindingType::ExtraDataType;
-    using NapiWrapperType = typename JSBindingType::NapiWrapperType;
-
-    // 必须由用户实现的方法
-    // static std::string GetClassName();
-
-    // 可选方法，默认实现
-    static InstanceType ConstructInstance(napi_env env, size_t argc, napi_value *argv) { return nullptr; }
-    static std::string GetParentName() { return ""; }
-    static bool IsAbstractClass() { return false; }
-    static std::vector<napi_property_descriptor> GetMethods() { return {}; }
-
-    static void RemoveWrapper(napi_env env, NapiWrapperType *wrapper) {}
-
-    template <typename E = ExtraData>
-    static auto CreateExtraData(napi_env env, const InstanceType &instance) -> std::enable_if_t<!std::is_void_v<E>, E> {
-        return E(); // 默认构造ExtraData
-    }
-};
+#include <unordered_map>
+#include <vector>
 
 
 template <typename T, typename Derived, typename ExtraData = void,
           template <typename> class StoragePolicy = SharedPtrStoragePolicy>
 class JSBinding {
-
-
 public:
     using NativeType = T;
     using StoragePolicyType = StoragePolicy<T>;
@@ -128,6 +29,13 @@ public:
     using InstanceType = typename StoragePolicyType::InstanceType;
     using SafeExtraDataType = std::conditional_t<std::is_void_v<ExtraData>, std::nullptr_t, ExtraData>;
     using ExtraDataType = SafeExtraDataType;
+
+#define NAPI_CALL(env, func) NAPI_CALL_BASE(env, func, __LINE__)
+
+#define NAPI_CALL_BASE(env, func, line)                                                                                \
+    if (napi_ok != func) {                                                                                             \
+        napi_throw_error(env, "NAPI_CALL_ERROR", #func);                                                               \
+    }
 
 
 #ifndef DEFINE_NAPI_WRAPPER
@@ -257,7 +165,7 @@ public:
 
     static bool IsAbstractClass() { return Derived::Traits::IsAbstractClass(); }
 
-    static std::vector<napi_property_descriptor> GetMethods() { return Derived::Traits::GetMethods(); }
+    static std::vector<napi_property_descriptor> GetMethods(napi_env env) { return Derived::Traits::GetMethods(env); }
 
     template <typename... Args> static InstanceType CreateInstance(Args... args) {
         return StoragePolicyType::Create(std::forward<Args>(args)...);
@@ -799,7 +707,6 @@ public:
     }
 
 
-
 #define DEFINE_VECTOR_CONVERSION(TYPE)                                                                                 \
     template <> static std::vector<TYPE> ParseArg<std::vector<TYPE>>(napi_env env, napi_value arg) {                   \
         std::vector<TYPE> result;                                                                                      \
@@ -883,10 +790,50 @@ public:
 #define DEFINE_SETTER(name, methodName)                                                                                \
     { name, nullptr, nullptr, nullptr, SetterWrapper<&DerivedType::methodName>, nullptr, napi_default, nullptr }
 
-#define DEFINE_GETTER_SETTER(name, getter, setter)                                                                     \
+#define DEFINE_ACCESSOR(name, getter, setter)                                                                          \
     {                                                                                                                  \
         name, nullptr, nullptr, GetterWrapper<&DerivedType::getter>, SetterWrapper<&DerivedType::setter>, nullptr,     \
             napi_default, nullptr                                                                                      \
+    }
+
+#define DEFINE_CONSTANT(name, env, value)                                                                              \
+    { name, nullptr, nullptr, nullptr, nullptr, ToNapiValue(env, value), napi_static, nullptr }
+
+
+    template <typename MethodType>
+    static inline napi_property_descriptor DefineMethod(const char *name, MethodType method) {
+        static_assert(std::is_member_function_pointer_v<MethodType>, "Method must be a member function pointer");
+        return DEFINE_METHOD(name, method);
+    }
+
+    template <typename MethodType>
+    static inline napi_property_descriptor DefineStaticMethod(const char *name, MethodType method) {
+        static_assert(std::is_member_function_pointer_v<MethodType>, "Static Method must be a member function pointer");
+        return DEFINE_STATIC_METHOD(name, method);
+    }
+
+    template <typename MethodType>
+    static inline napi_property_descriptor DefineGetter(const char *name, MethodType method) {
+        static_assert(std::is_member_function_pointer_v<MethodType>, "Getter must be a member function pointer");
+        return DEFINE_GETTER(name, method);
+    }
+
+    template <typename MethodType>
+    static inline napi_property_descriptor DefineSetter(const char *name, MethodType method) {
+        static_assert(std::is_member_function_pointer_v<MethodType>, "Setter must be a member function pointer");
+        return DEFINE_SETTER(name, method);
+    }
+
+    template <typename GetterMethodType, typename SetterMethodType>
+    static inline napi_property_descriptor DefineAccessor(const char *name, GetterMethodType getter,
+                                                          SetterMethodType setter) {
+        static_assert(std::is_member_function_pointer_v<GetterMethodType>, "Getter must be a member function pointer");
+        static_assert(std::is_member_function_pointer_v<SetterMethodType>, "Setter must be a member function pointer");
+        return DEFINE_GETTER_SETTER(name, getter, setter);
+    }
+
+    static inline napi_property_descriptor DefineConstant(const char *name, napi_env env, napi_value value) {
+        return DEFINE_CONSTANT(name, env, value);
     }
 
     static napi_value Init(napi_env env, napi_value exports) {
@@ -896,7 +843,7 @@ public:
         static_assert(traits_check::ValidateTraits<typename Derived::Traits>::value,
                       "Traits class does not implement all required methods");
         const std::string className = GetClassName();
-        std::vector<napi_property_descriptor> methods = GetMethods();
+        std::vector<napi_property_descriptor> methods = GetMethods(env);
         napi_value parent = GetParentConstructor(env, exports);
         napi_value cons = DefineClass(env, className, parent, methods.data(), methods.size(), IsAbstractClass());
         napi_set_named_property(env, exports, className.c_str(), cons);
@@ -950,9 +897,6 @@ public:
             nativeToJsMap_.erase(it);
         }
     }
-
-
-private:
 
 
 // getter包装器

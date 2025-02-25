@@ -6,42 +6,65 @@
 
 #ifndef JEMOC_STREAM_TEST_XMLREADERBINDING_H
 #define JEMOC_STREAM_TEST_XMLREADERBINDING_H
-#include "JSBinding.h"
 #include "binding/TextReaderBinding.h"
+#include "binding/binding.h"
 #include "reader/XmlReader.h"
 
 class XmlReaderBinding : public JSBinding<XmlReader, XmlReaderBinding> {
 public:
+//     struct Traits : public DefaultJSBindingTraits<XmlReaderBinding> {
+//         static std::string GetClassName() { return "XmlReader"; }
+//         static InstanceType ConstructInstance(napi_env env, size_t argc, napi_value *argv) {
+//             std::string xmlStr;
+//             if (As<std::string>(env, argv[0], &xmlStr)) {
+//                 return StoragePolicyType::Create(xmlStr);
+//             }
+//             return StoragePolicyType::Create(TextReaderBinding::GetWrapper(env, argv[0])->GetShared());
+//         }
+//         static std::vector<napi_property_descriptor> GetMethods() {
+//             return {
+//                 DEFINE_METHOD("read", Read),
+//                 DEFINE_GETTER("name", GetName),
+//                 DEFINE_GETTER("value", GetValue),
+//                 DEFINE_GETTER("nodeType", GetNodeType),
+//                 DEFINE_METHOD("getAttribute", GetAttribute),
+//                 DEFINE_GETTER("attributes", GetAttributes),
+//                 DEFINE_GETTER("isEmptyElement", GetIsEmptyElement),
+//                 {"close", nullptr, Close, nullptr, nullptr, nullptr, napi_default, nullptr},
+//             };
+//         }
+//     };
+
     struct Traits : public DefaultJSBindingTraits<XmlReaderBinding> {
-        static std::string GetClassName() { return "XmlReader"; }
-        static InstanceType ConstructInstance(napi_env env, size_t argc, napi_value *argv) {
-            std::string xmlStr;
-            if (As<std::string>(env, argv[0], &xmlStr)) {
-                return StoragePolicyType::Create(xmlStr);
-            }
-            return StoragePolicyType::Create(TextReaderBinding::GetWrapper(env, argv[0])->GetShared());
-        }
-        static std::vector<napi_property_descriptor> GetMethods() {
-            return {
-                DEFINE_METHOD("read", Read),
-                DEFINE_GETTER("name", GetName),
-                DEFINE_GETTER("value", GetValue),
-                DEFINE_GETTER("nodeType", GetNodeType),
-                DEFINE_METHOD("getAttribute", GetAttribute),
-                DEFINE_GETTER("attributes", GetAttributes),
-                DEFINE_GETTER("isEmptyElement", GetIsEmptyElement),
-                {"close", nullptr, Close, nullptr, nullptr, nullptr, napi_default, nullptr},
-            };
-        }
+        DECLARE_BINDING(XmlReader, "", false)
+
+        DECLARE_METHODS_START{
+            DEFINE_METHOD("read", Read),
+            DEFINE_GETTER("name", GetName),
+            DEFINE_GETTER("value", GetValue),
+            DEFINE_GETTER("nodeType", GetNodeType),
+            DEFINE_METHOD("getAttribute", GetAttribute),
+            DEFINE_GETTER("attributes", GetAttributes),
+            DEFINE_GETTER("isEmptyElement", GetIsEmptyElement),
+            DEFINE_CONSTANT("test", env, 1),
+            {"close", nullptr, Close, nullptr, nullptr, nullptr, napi_default, nullptr},
+        } DECLARE_METHODS_END
+
+        DEFINE_CONSTRUCTOR(Constructor)
     };
 
+
 protected:
+    static InstanceType Constructor(napi_env env, size_t argc, napi_value *argv) {
+        std::string xmlStr;
+        if (As<std::string>(env, argv[0], &xmlStr)) {
+            return StoragePolicyType::Create(xmlStr);
+        }
+        return StoragePolicyType::Create(TextReaderBinding::GetWrapper(env, argv[0])->GetShared());
+    }
     static bool Read(XmlReader *reader) { return reader->Read(); }
 
-    static int GetNodeType(XmlReader *reader) {
-       return static_cast<int>(reader->GetNodeType());
-     
-    }
+    static int GetNodeType(XmlReader *reader) { return static_cast<int>(reader->GetNodeType()); }
 
     static std::string GetName(XmlReader *reader) { return reader->GetName(); }
 

@@ -7,7 +7,7 @@
 #ifndef JEMOC_STREAM_TEST_STREAMREADERBINDING_H
 #define JEMOC_STREAM_TEST_STREAMREADERBINDING_H
 
-#include "JSBinding.h"
+#include "binding/binding.h"
 #include "reader/StreamReader.h"
 #include <algorithm> // std::transform
 #include <cctype>    // std::toupper
@@ -64,7 +64,7 @@ public:
             }
         }
         static std::string GetParentName() { return "TextReader"; }
-        static std::vector<napi_property_descriptor> GetMethods() {
+        static std::vector<napi_property_descriptor> GetMethods(napi_env env) {
             return {
                 DEFINE_GETTER("encoding", GetEncoding),
                 DEFINE_GETTER("endOfStream", GetEndOfStream),

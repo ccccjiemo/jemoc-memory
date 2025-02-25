@@ -28,17 +28,19 @@ struct Index {
         const r1 = new reader.StreamReader(ms, { detectEncodingFromByteOrderMarks: false, encoding: 'utf-8' });
 
         const result = r1.readToEnd();
-
-        const xmlReader = new reader.XmlReader(`<?xml version="1.0" encoding="utf-8" ?>
+        try {
+          const xmlReader = new reader.XmlReader(`<?xml version="1.0" encoding="utf-8" ?>
         <root>
           <cat color="white">I'm a Cat</cat>
           <dog color="yellow"/>
           </root>`);
 
-        while (xmlReader.read()) {
-          console.log(`${xmlReader.nodeType}`)
+          while (xmlReader.read()) {
+            console.log(`${xmlReader.nodeType}`)
+          }
+        } catch (e) {
+          console.log(e);
         }
-
 
         console.log('finish');
       })
