@@ -12,6 +12,14 @@
 #include "zip/ZipArchiveEntry.h"
 #include "zip/ZipCryptoStream.h"
 
+DECLARE_ROOT_START(ReaderModule)
+DECLARE_NAMESPACE_START(reader)
+DECLARE_CLASS(TextReaderBinding)
+DECLARE_CLASS(StreamReaderBinding)
+DECLARE_CLASS(XmlReaderBinding)
+DECLARE_NAMESPACE_END
+DECLARE_ROOT_END
+
 
 EXTERN_C_START
 static napi_value Init(napi_env env, napi_value exports) {
@@ -30,12 +38,12 @@ static napi_value Init(napi_env env, napi_value exports) {
     jemoc_stream::BufferPool::Export(env, exports);
     jemoc_stream::LruBufferPool::Export(env, exports);
 
-    TextReaderBinding::Init(env, exports);
-    StreamReaderBinding::Init(env, exports);
-    
+   
 
-
-    XmlReaderBinding::Init(env, exports);
+    napi_value reader = JSBindingTool::ExportNamespace(env, exports, "reader");
+    TextReaderBinding::ExportTopLevel(env, reader);
+    StreamReaderBinding::ExportTopLevel(env, reader);
+    XmlReaderBinding::ExportTopLevel(env, reader);
 
     return exports;
 }

@@ -35,23 +35,14 @@ public:
 //         }
 //     };
 
-    struct Traits : public DefaultJSBindingTraits<XmlReaderBinding> {
-        DECLARE_BINDING(XmlReader, "", false)
-
-        DECLARE_METHODS_START{
-            DEFINE_METHOD("read", Read),
-            DEFINE_GETTER("name", GetName),
-            DEFINE_GETTER("value", GetValue),
-            DEFINE_GETTER("nodeType", GetNodeType),
-            DEFINE_METHOD("getAttribute", GetAttribute),
-            DEFINE_GETTER("attributes", GetAttributes),
-            DEFINE_GETTER("isEmptyElement", GetIsEmptyElement),
+    DECLARE_BINDING(XmlReader, XmlReaderBinding)
+    METHODS(DEFINE_METHOD("read", Read), DEFINE_GETTER("name", GetName), DEFINE_GETTER("value", GetValue),
+            DEFINE_GETTER("nodeType", GetNodeType), DEFINE_METHOD("getAttribute", GetAttribute),
+            DEFINE_GETTER("attributes", GetAttributes), DEFINE_GETTER("isEmptyElement", GetIsEmptyElement),
             DEFINE_CONSTANT("test", env, 1),
-            {"close", nullptr, Close, nullptr, nullptr, nullptr, napi_default, nullptr},
-        } DECLARE_METHODS_END
-
-        DEFINE_CONSTRUCTOR(Constructor)
-    };
+            {"close", nullptr, Close, nullptr, nullptr, nullptr, napi_default, nullptr})
+    CONSTRUCTOR(Constructor)
+    END_BINDING
 
 
 protected:

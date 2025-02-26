@@ -1,4 +1,3 @@
-export {XmlReader} from 'libjemoc_stream.so'
 export enum XmlNodeType {
   None,
   Element,

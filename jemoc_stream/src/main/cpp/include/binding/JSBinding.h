@@ -8,15 +8,16 @@
 #define JEMOC_STREAM_TEST_JSBINDING_H
 
 #include "StoragePolicy.h"
+#include "binding/DefaultJSBindingTraits.h"
 #include "napi/native_api.h"
 #include "traits_check.h"
 #include <map>
 #include <mutex>
+#include <sstream>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
 #include <vector>
-
 
 template <typename T, typename Derived, typename ExtraData = void,
           template <typename> class StoragePolicy = SharedPtrStoragePolicy>
@@ -30,6 +31,7 @@ public:
     using SafeExtraDataType = std::conditional_t<std::is_void_v<ExtraData>, std::nullptr_t, ExtraData>;
     using ExtraDataType = SafeExtraDataType;
 
+
 #define NAPI_CALL(env, func) NAPI_CALL_BASE(env, func, __LINE__)
 
 #define NAPI_CALL_BASE(env, func, line)                                                                                \
@@ -37,6 +39,35 @@ public:
         napi_throw_error(env, "NAPI_CALL_ERROR", #func);                                                               \
     }
 
+#ifndef DEFINE_DEFAULT_METHOD
+#define DEFINE_DEFAULT_METHOD
+
+    static napi_value ExportNamespace(napi_env env, napi_value exports, const std::string &nsName) {
+        napi_value nsObject;
+        NAPI_CALL(env, napi_get_named_property(env, exports, nsName.c_str(), &nsObject))
+        napi_valuetype type;
+        NAPI_CALL(env, napi_typeof(env, nsObject, &type))
+        if (type != napi_object) {
+            NAPI_CALL(env, napi_create_object(env, &nsObject))
+            NAPI_CALL(env, napi_set_named_property(env, exports, nsName.c_str(), nsObject))
+        }
+        return nsObject;
+    }
+
+    template <typename ObjectType>
+    static void ExportObject(napi_env env, napi_value exports, const std::string &name, const ObjectType obj) {
+        napi_value jsObject = ConvertToJSObject(env, obj);
+        NAPI_CALL(env, napi_set_named_property(env, exports, name.c_str(), jsObject))
+    }
+
+    template <typename ConstantType>
+    static void ExportConstant(napi_env env, napi_value exports, const std::string &name, const ConstantType &value) {
+        NAPI_CALL(env, napi_set_name_property(env, exports, name.c_str(), ToNapiValue(env, value)))
+    }
+
+    static void ExportTopLevel(napi_env env, napi_value exports) { Init(env, exports); }
+
+#endif // DEFINE_DEFAULT_METHOD
 
 #ifndef DEFINE_NAPI_WRAPPER
 #define DEFINE_NAPI_WRAPPER
@@ -72,6 +103,13 @@ public:
     };
 
     using NapiWrapperType = NapiWrapper;
+
+    struct JSCallbackInfo {
+        napi_env env;
+        std::vector<napi_value> argv;
+        napi_value thisArgs;
+        NapiWrapperType *wrapper;
+    };
 
 
 #endif // DEFINE_NAPI_WRAPPER
@@ -758,12 +796,31 @@ public:
 #endif // JSBinding_ArgParse
 
     static napi_value GetParentConstructor(napi_env env, napi_value exports) {
-        std::string parentName = Derived::Traits::GetParentName();
-        napi_value parent = nullptr;
-        if (!parentName.empty()) {
-            napi_get_named_property(env, exports, parentName.c_str(), &parent);
+//        std::string parentName = Derived::Traits::GetParentName();
+//        napi_value parent = nullptr;
+//        if (!parentName.empty()) {
+//            napi_get_named_property(env, exports, parentName.c_str(), &parent);
+//        }
+//        return parent;
+        std::string ns = Derived::Traits::GetNameSpacePath();
+        std::string pn = Derived::Traits::GetParentName();
+        const std::string parentFullName = ns + (ns.empty() ? "" : ".") + pn;
+        if (parentFullName.empty())
+            return nullptr;
+        std::istringstream iss(parentFullName);
+        std::string segment;
+        napi_value current = exports;
+
+        while (std::getline(iss, segment, '.')) {
+            napi_value next;
+            napi_status status = napi_get_named_property(env, current, segment.c_str(), &next);
+            if (status != napi_ok || !IsConstructor(env, next)) {
+                napi_throw_error(env, nullptr, ("Parent class not found: " + parentFullName).c_str());
+                return nullptr;
+            }
+            current = next;
         }
-        return parent;
+        return current;
     }
 
     static NapiWrapper *GetWrapper(napi_env env, napi_value value) {
@@ -987,6 +1044,18 @@ public:
             // 获取napi包装器
             NapiWrapper *wrapper = GetWrapper(env, thisArg);
 
+            JSCallbackInfo info{.env = env, .argv = argv, .thisArgs = thisArg, .wrapper = wrapper};
+
+
+            if constexpr (std::is_invocable_v<decltype(Method), const JSCallbackInfo &>) {
+                if constexpr (std::is_same_v<std::invoke_result_t<decltype(Method), const JSCallbackInfo &>,
+                                             napi_value>) {
+                    return Method(info);
+                } else {
+                    return ToNapiValue(env, Method(info));
+                }
+            }
+
             T *native = wrapper->GetNative();
             if (!native) {
                 napi_throw_error(env, nullptr, "Failed to get native instance");
@@ -1040,9 +1109,123 @@ public:
     }
 
 private:
+    template <typename ObjectType> static napi_value ConvertToJSObject(napi_env env, const ObjectType &obj) {
+        napi_value jsObj;
+        NAPI_CALL(env, napi_create_object(env, &jsObj))
+        if constexpr (is_exportable_struct_v<ObjectType>) {
+            ExportStructFields(env, jsObj, obj);
+        } else if constexpr (has_iterator_v<ObjectType>) {
+            for (const auto &[key, val] : obj) {
+                NAPI_CALL(env, napi_set_property(env, jsObj, ToNapiValue(env, key), ConvertToJSObject(env, val)))
+            }
+        }
+        return jsObj;
+    }
+
+    template <typename ObjectType>
+    static void ExportStructFields(napi_env env, napi_value jsObj, const ObjectType &structInst) {
+        static_assert(is_exportable_struct_v<ObjectType>, "Type must declare __js_binding_fields");
+        for (const auto &[name, memberPtr] : ObjectType::__js_binding_fields) {
+            auto &&value = structInst.*memberPtr;
+            NAPI_CALL(env, napi_set_named_property(env, jsObj, name, ConvertToJSObject(env, value)))
+        }
+    }
+
+    static bool IsConstructor(napi_env env, napi_value value) {
+        napi_valuetype type;
+        napi_typeof(env, value, &type);
+        if (type != napi_function)
+            return false;
+
+        napi_value prototype;
+        napi_get_named_property(env, value, "prototype", &prototype);
+
+        napi_valuetype prototypeType;
+        napi_typeof(env, prototype, &prototypeType);
+
+        return prototypeType == napi_object;
+    }
+
+
+    template <typename ObjectType, typename = void> struct has_iterator : std::false_type {};
+
+    template <typename ObjectType>
+    struct has_iterator<ObjectType, std::void_t<decltype(std::declval<ObjectType>().begin()),
+                                                decltype(std::declval<ObjectType>().end())>> : std::true_type {};
+    template <typename ObjectType> static constexpr bool has_iterator_v = has_iterator<ObjectType>::value;
+
+    template <typename ObjectType, typename = void> struct is_exportable_struct : std::false_type {};
+
+    template <typename ObjectType>
+    struct is_exportable_struct<ObjectType, std::void_t<decltype(ObjectType::__js_binding_fields)>> : std::true_type {};
+
+    template <typename ObjectType> static constexpr bool is_exportable_struct_v = is_exportable_struct<T>::value;
+
     inline static std::unordered_map<T *, std::pair<napi_env, napi_ref>> nativeToJsMap_;
     inline static std::mutex nativeToJsMutex_;
 };
 
+#define JS_BINDING_STRUCT(type, ...)                                                                                   \
+    static constexpr auto__js_binding_fields = std::make_tuple(__VA_ARGS__);                                           \
+    using __js_binding_type = type
+
+// ... existing code ...
+
+// 添加导出系统宏
+#define DECLARE_ROOT_START(ns)                                                                                         \
+    struct __##ns##_##ExportRegistry {                                                                                 \
+        static void Init(napi_env env, napi_value exports) {                                                           \
+            std::vector<std::function<void(napi_env, napi_value)>> __exportStack;                                      \
+            std::vector<std::string> __nsStack;                                                                        \
+            napi_value __currentTarget = exports;                                                                      \
+            std::vector<napi_value> __targetStack;
+
+#define DECLARE_NAMESPACE_START(name)                                                                                  \
+    __nsStack.push_back(#name);                                                                                        \
+    napi_value __ns_##name;                                                                                            \
+    napi_create_object(env, &__ns_##name);                                                                             \
+    napi_set_named_property(env, __currentTarget, #name, __ns_##name);                                                 \
+    __targetStack.push_back(__currentTarget);                                                                          \
+    __currentTarget = __ns_##name;
+
+#define DECLARE_NAMESPACE_END                                                                                          \
+    __nsStack.pop_back();                                                                                              \
+    __currentTarget = __targetStack.back();                                                                            \
+    __targetStack.pop_back();
+
+#define DECLARE_CLASS(ClassName)                                                                                       \
+    __exportStack.emplace_back([&](napi_env env, napi_value target) {                                                  \
+        const std::string nsPath = GetCurrentNamespace(__nsStack);                                                     \
+        ClassName::Traits::SetNameSpacePath(nsPath);                                                                   \
+        ClassName::ExportTopLevel(env, target);                                                                        \
+    });
+
+#define DECLARE_CONSTANT(key, value)                                                                                   \
+    __exportStack.emplace_back(                                                                                        \
+        [=](napi_env env, napi_value target) { JSBinding<>::ExportConstant(env, target, key, value); });
+
+#define DECLARE_OBJECT(key, obj)                                                                                       \
+    __exportStack.emplace_back(                                                                                        \
+        [=](napi_env env, napi_value target) { JSBinding<>::ExportObject(env, target, key, obj); });
+
+#define DECLARE_ROOT_END                                                                                               \
+    for (auto &exporter : __exportStack) {                                                                             \
+        exporter(env, __currentTarget);                                                                                \
+    }                                                                                                                  \
+    }                                                                                                                  \
+    }                                                                                                                  \
+    ;
+
+static std::string GetCurrentNamespace(const std::vector<std::string> &stack) {
+    if (stack.empty())
+        return "";
+    std::string path;
+    for (const auto &ns : stack) {
+        path += ns + ".";
+    }
+    return path.substr(0, path.size() - 1);
+}
+
+using JSBindingTool = JSBinding<void, void>;
 
 #endif // JEMOC_STREAM_TEST_JSBINDING_H

@@ -476,36 +476,72 @@ export class BrotliUtils {
   static decompressAsync(buffer: BufferLike | string): Promise<ArrayBuffer>
 }
 
-export abstract class TextReader {
-  abstract read(buffer?: ArrayBuffer): number;
+// export abstract class TextReader {
+//   abstract read(buffer?: ArrayBuffer): number;
+//
+//   abstract readLine(): string;
+//
+//   abstract readToEnd(): string;
+//
+//   abstract skip(count: number): number;
+//
+//   abstract peek(): number;
+//
+//   abstract close: void;
+// }
+//
+// export class StreamReader extends TextReader {
+//   constructor(target: string | IStream, { detectEncodingFromByteOrderMarks: boolean, encoding: string })
+//
+//   readToEnd(): string;
+//
+//   skip(count: number): number;
+//
+//   peek(): number;
+//
+//   close: void;
+//
+//   read(buffer?: ArrayBuffer | undefined): number;
+//
+//   readLine(): string;
+//
+//   get encoding(): string;
+// }
+//
+// export class XmlReader {}
 
-  abstract readLine(): string;
+export namespace reader {
+  export abstract class TextReader {
+    abstract read(buffer?: ArrayBuffer): number;
 
-  abstract readToEnd(): string;
+    abstract readLine(): string;
 
-  abstract skip(count: number): number;
+    abstract readToEnd(): string;
 
-  abstract peek(): number;
+    abstract skip(count: number): number;
 
-  abstract close: void;
+    abstract peek(): number;
+
+    abstract close: void;
+  }
+
+  export class StreamReader extends TextReader {
+    constructor(target: string | IStream, { detectEncodingFromByteOrderMarks: boolean, encoding: string })
+
+    readToEnd(): string;
+
+    skip(count: number): number;
+
+    peek(): number;
+
+    close: void;
+
+    read(buffer?: ArrayBuffer | undefined): number;
+
+    readLine(): string;
+
+    get encoding(): string;
+  }
+
+  export class XmlReader {}
 }
-
-export class StreamReader extends TextReader {
-  constructor(target: string | IStream, { detectEncodingFromByteOrderMarks: boolean, encoding: string })
-
-  readToEnd(): string;
-
-  skip(count: number): number;
-
-  peek(): number;
-
-  close: void;
-
-  read(buffer?: ArrayBuffer | undefined): number;
-
-  readLine(): string;
-
-  get encoding(): string;
-}
-
-export class XmlReader {}

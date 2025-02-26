@@ -1,56 +1,42 @@
 #include <napi/native_api.h>
 #include <type_traits>
 
-// region 宏定义：Traits 构建工具
 
-// 基础声明宏（必填类名，可选父类名和抽象标志）
-#define DECLARE_BINDING(ClassName, ParentName,...)                                                                                \
-    static std::string GetClassName() { return #ClassName; }                                                           \
-    static std::string GetParentName() { return ParentName; }                                        \
-    static bool IsAbstractClass() { return GET_ABSTRACT_FLAG(__VA_ARGS__, false); }
 
-// 方法列表包裹宏
-#define DECLARE_METHODS_START                                                                                          \
-    static std::vector<napi_property_descriptor> GetMethods(napi_env env) {                                            \
-        return
+// 核心声明宏（支持链式调用）
+#define DECLARE_BINDING(ClassName, Derived)                                                                            \
+public:                                                                                                                \
+    struct Traits : public DefaultJSBindingTraits<Derived> {                                                           \
+        using Base = DefaultJSBindingTraits<Derived>;                                                                  \
+        static constexpr auto GetClassName() { return #ClassName; }
 
-#define DECLARE_METHODS_END                                                                                            \
-    ;                                                                                                                  \
-    }
+#define INHERITS(ParentClass)                                                                                          \
+    static constexpr auto GetParentName() { return ParentClass; }
 
-//// 单个方法定义宏（支持重载检测）
-// #def ine DEFINE_METHOD(Name, Method) \
-//    DECLARE_METHOD_IMPL(Name, Method, decltype(Method))
+#define ABSTRACT_CLASS                                                                                                 \
+    static constexpr bool IsAbstractClass() { return true; }
 
-// 构造函数绑定宏
-#define DEFINE_CONSTRUCTOR(Func)                                                                                       \
-    static InstanceType ConstructInstance(napi_env env, size_t argc, napi_value *argv) { return Func(env, argc, argv); }
+#define METHODS(...)                                                                                                   \
+    static auto GetMethods(napi_env env) { return std::vector<napi_property_descriptor>{__VA_ARGS__}; }
 
-// 自定义 RemoveWrapper 宏
-#define DEFINE_REMOVE_WRAPPER(Func)                                                                                    \
+#define CONSTRUCTOR(Func)                                                                                              \
+    static auto ConstructInstance(napi_env env, size_t argc, napi_value *argv) { return Func(env, argc, argv); }
+
+#define REMOVE_WRAPPER(Func)                                                                                           \
     static void RemoveWrapper(napi_env env, NapiWrapperType *wrapper) { Func(env, wrapper); }
 
-// endregion
+#define END_BINDING                                                                                                    \
+    }                                                                                                                  \
+    ;                                                                                                                  \
+    using TraitsType = Traits; /* 类型别名用于IDE提示 */                                                       \
+    /**/
 
-// region 辅助宏（参数解析与重载检测）
-
-// 提取父类名（支持可选参数）
-#define GET_PARENT_NAME(...) GET_PARENT_NAME_IMPL(__VA_ARGS__, "")
-#define GET_PARENT_NAME_IMPL(Parent, ...) #Parent
-
-// 提取抽象标志（支持可选参数）
-#define GET_ABSTRACT_FLAG(...) GET_ABSTRACT_FLAG_IMPL(__VA_ARGS__, false)
-#define GET_ABSTRACT_FLAG_IMPL(Flag, ...) Flag
-
-// 方法定义实现（类型安全检查）
-#define DECLARE_METHOD_IMPL(Name, Method, Signature)                                                                   \
-    []() {                                                                                                             \
-        using MethodType = std::decay_t<decltype(Method)>;                                                             \
-        static_assert(std::is_invocable_r_v<napi_value, MethodType, NativeType *, napi_env, size_t, napi_value *> ||   \
-                          std::is_invocable_r_v<napi_value, MethodType, NativeType *, napi_env>,                       \
-                      "Method signature must be: napi_value Method(T*, napi_env, size_t, napi_value*) or napi_value "  \
-                      "Method(T*, napi_env)");                                                                         \
-        return napi_property_descriptor{Name, nullptr, Method, nullptr, nullptr, nullptr, napi_default, nullptr};      \
+// 方法定义宏（支持重载检测）
+#define METHOD(Name, Func)                                                                                             \
+    [] {                                                                                                               \
+        using FuncType = decltype(&Func);                                                                              \
+        static_assert(traits_check::IsValidMethod<FuncType>::value, "Invalid method signature");                       \
+        return napi_property_descriptor{#Name, nullptr, Func, nullptr, nullptr, nullptr, napi_default, nullptr};       \
     }()
 
 // endregion

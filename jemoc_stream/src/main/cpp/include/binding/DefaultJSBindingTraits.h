@@ -66,16 +66,19 @@ template <typename Derived> struct DefaultJSBindingTraits {
     static InstanceType ConstructInstance(napi_env env, size_t argc, napi_value *argv) { return nullptr; }
     static std::string GetParentName() { return ""; }
     static bool IsAbstractClass() { return false; }
-    static std::vector<napi_property_descriptor> GetMethods(napi_env env) { 
-        return {}; 
-    }
+    static std::vector<napi_property_descriptor> GetMethods(napi_env env) { return {}; }
 
+    static void SetNameSpacePath(const std::string nsName) { NameSpacePath = nsName; }
+    static std::string GetNameSpacePath() { return NameSpacePath; }
     static void RemoveWrapper(napi_env env, NapiWrapperType *wrapper) {}
 
     template <typename E = ExtraData>
     static auto CreateExtraData(napi_env env, const InstanceType &instance) -> std::enable_if_t<!std::is_void_v<E>, E> {
         return E(); // 默认构造ExtraData
     }
+
+private:
+    static inline std::string NameSpacePath = "";
 };
 
-#endif //JEMOC_STREAM_TEST_DEFAULTJSBINDINGTRAITS_H
+#endif // JEMOC_STREAM_TEST_DEFAULTJSBINDINGTRAITS_H

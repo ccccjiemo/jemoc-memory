@@ -11,22 +11,12 @@
 
 class TextReaderBinding : public JSBinding<TextReader, TextReaderBinding> {
 
-
-public:
-    struct Traits : public DefaultJSBindingTraits<TextReaderBinding> {
-        static std::string GetClassName() { return "TextReader"; }
-        static bool IsAbstractClass() { return true; }
-        static std::vector<napi_property_descriptor> GetMethods(napi_env env) {
-            return {
-                DEFINE_METHOD("read", Read),
-                DEFINE_METHOD("readLine", ReadLine),
-                DEFINE_METHOD("readToEnd", ReadToEnd),
-                DEFINE_METHOD("skip", Skip),
-                DEFINE_METHOD("peek", Peek),
-                {"close", nullptr, Close, nullptr, nullptr, nullptr, napi_default, nullptr},
-            };
-        }
-    };
+    DECLARE_BINDING(TextReader, TextReaderBinding)
+    ABSTRACT_CLASS
+    METHODS(DEFINE_METHOD("read", Read), DEFINE_METHOD("readLine", ReadLine), DEFINE_METHOD("readToEnd", ReadToEnd),
+            DEFINE_METHOD("skip", Skip), DEFINE_METHOD("peek", Peek),
+            {"close", nullptr, Close, nullptr, nullptr, nullptr, napi_default, nullptr})
+    END_BINDING
 
 protected:
     static napi_value Read(TextReader *reader, napi_env env, size_t argc, napi_value *argv) {
@@ -66,7 +56,6 @@ protected:
         }
         return nullptr;
     }
-
 };
 
 #endif // JEMOC_STREAM_TEST_TEXTREADERBINDING_H

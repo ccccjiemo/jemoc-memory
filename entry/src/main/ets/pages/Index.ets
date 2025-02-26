@@ -19,8 +19,6 @@ struct Index {
         //
         //   })
         // })
-
-
         const ms = new base.MemoryStream();
         ms.write(util.TextEncoder.create()
           .encodeInto("hello world! this is a stream reader test; 这是StreamReader测试;!"));

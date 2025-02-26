@@ -62,8 +62,11 @@ bool StreamReader::DecodeNextBuffer() {
     if (endOfStream)
         return false;
     if (!FillBuffer())
-        endOfStream = true;
+        {
+                endOfStream = true;
     return false;
+        }
+
 
     if (!converter) {
         converter = EncodingConverterFactory::Create(encoding);
